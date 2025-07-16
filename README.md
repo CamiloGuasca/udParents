@@ -1,3 +1,3 @@
 # udParents
 
-Aplicación de control parental desarrolladad en kotlin. Para proyecto de grado.
+Aplicación de control parental desarrollada en kotlin para proyecto de grado.
