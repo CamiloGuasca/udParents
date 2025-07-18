@@ -1,13 +1,18 @@
 package com.example.udparents.navegacion
 
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.udparents.vista.pantallas.PantallaBienvenida
+import com.example.udparents.vista.pantallas.PantallaCodigoPadre
+import com.example.udparents.vista.pantallas.PantallaDispositivosVinculados
 import com.example.udparents.vista.pantallas.PantallaInicioSesion
 import com.example.udparents.vista.pantallas.PantallaPrincipal
 import com.example.udparents.vista.pantallas.PantallaRegistro
 import com.example.udparents.vista.pantallas.PantallaRecuperarContrasena
+import com.example.udparents.vista.pantallas.PantallaVinculacionHijo
 
 /**
  * Rutas nombradas para facilitar la navegación.
@@ -17,6 +22,10 @@ object Rutas {
     const val REGISTRO = "registro"
     const val RECUPERAR = "recuperar"
     const val PRINCIPAL = "principal"
+    const val CODIGO_PADRE = "codigo_padre"
+    const val VINCULACION_HIJO = "vinculacion_hijo"
+    const val BIENVENIDA = "bienvenida"
+    const val DISPOSITIVOS_VINCULADOS = "dispositivos_vinculados"
 
 }
 
@@ -29,7 +38,7 @@ fun NavegacionApp() {
 
     NavHost(
         navController = navController,
-        startDestination = Rutas.INICIO_SESION
+        startDestination = Rutas.BIENVENIDA
     ) {
         // Pantalla de INICIO DE SESIÓN
         composable(Rutas.INICIO_SESION) {
@@ -78,9 +87,61 @@ fun NavegacionApp() {
                     navController.navigate(Rutas.INICIO_SESION) {
                         popUpTo(Rutas.INICIO_SESION) { inclusive = true }
                     }
+                },
+                onIrAVinculacionPadre = {
+                    navController.navigate(Rutas.CODIGO_PADRE)
+                },
+                onIrADispositivosVinculados = {
+                    navController.navigate(Rutas.DISPOSITIVOS_VINCULADOS)
                 }
             )
         }
+
+
+        composable(Rutas.CODIGO_PADRE) {
+            PantallaCodigoPadre(
+                onVolverAlMenuPrincipal = {
+                    navController.navigate(Rutas.PRINCIPAL) {
+                        popUpTo(Rutas.PRINCIPAL) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+
+        composable(Rutas.DISPOSITIVOS_VINCULADOS) {
+            PantallaDispositivosVinculados(
+                onVolverAlMenuPadre = {
+                    navController.navigate(Rutas.PRINCIPAL) {
+                        popUpTo(Rutas.PRINCIPAL) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+
+        composable(Rutas.VINCULACION_HIJO) {
+            PantallaVinculacionHijo(
+                vistaModelo = viewModel(),
+                onVolverAlPadre = {
+                    navController.navigate(Rutas.BIENVENIDA) {
+                        popUpTo(Rutas.VINCULACION_HIJO) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Rutas.BIENVENIDA) {
+            PantallaBienvenida(
+                onPadreSeleccionado = {
+                    navController.navigate(Rutas.INICIO_SESION)
+                },
+                onHijoSeleccionado = {
+                    navController.navigate(Rutas.VINCULACION_HIJO)
+                }
+            )
+        }
+
 
     }
 }
