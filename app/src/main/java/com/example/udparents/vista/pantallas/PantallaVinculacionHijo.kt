@@ -23,23 +23,20 @@ fun PantallaVinculacionHijo(
     val context = LocalContext.current
     val activity = context as? Activity
 
+    // ✅ Autenticación anónima del hijo si aún no está autenticado
+    LaunchedEffect(Unit) {
+        val user = FirebaseAuth.getInstance().currentUser
+        if (user == null) {
+            FirebaseAuth.getInstance().signInAnonymously()
+        }
+    }
+
     var codigo by remember { mutableStateOf("") }
     var nombre by remember { mutableStateOf("") }
     var edad by remember { mutableStateOf("") }
     var sexo by remember { mutableStateOf("") }
     var mensajeError by remember { mutableStateOf("") }
     var mostrarDialogoExito by remember { mutableStateOf(false) }
-
-    // ✅ Autenticación anónima del hijo si aún no está autenticado
-    LaunchedEffect(Unit) {
-        val user = FirebaseAuth.getInstance().currentUser
-        if (user == null) {
-            FirebaseAuth.getInstance().signInAnonymously()
-                .addOnFailureListener {
-                    mensajeError = "Error al autenticar: ${it.message}"
-                }
-        }
-    }
 
     if (mostrarDialogoExito) {
         AlertDialog(
@@ -53,6 +50,7 @@ fun PantallaVinculacionHijo(
             }
         )
 
+        // 🔁 Auto cerrar después de 2.5 segundos
         LaunchedEffect(Unit) {
             delay(2500)
             activity?.finish()
@@ -111,13 +109,6 @@ fun PantallaVinculacionHijo(
             onClick = {
                 if (codigo.isBlank() || nombre.isBlank() || edad.isBlank() || sexo.isBlank()) {
                     mensajeError = "Por favor complete todos los campos."
-                    return@Button
-                }
-
-                // ✅ Verificamos que el hijo esté autenticado y tenga UID
-                val idHijo = FirebaseAuth.getInstance().currentUser?.uid
-                if (idHijo.isNullOrEmpty()) {
-                    mensajeError = "No se pudo obtener el ID del hijo. Asegúrate de que esté autenticado."
                     return@Button
                 }
 
