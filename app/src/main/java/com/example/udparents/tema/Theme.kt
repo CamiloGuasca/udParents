@@ -1,6 +1,6 @@
-package com.example.udparents.ui.theme
 
-import android.app.Activity
+package com.example.udparents.tema
+
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
