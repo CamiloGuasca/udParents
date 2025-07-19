@@ -1,10 +1,12 @@
 package com.example.udparents.navegacion
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.udparents.viewmodel.VistaModeloUsuario
 import com.example.udparents.vista.pantallas.PantallaBienvenida
 import com.example.udparents.vista.pantallas.PantallaCodigoPadre
 import com.example.udparents.vista.pantallas.PantallaDispositivosVinculados
@@ -59,11 +61,13 @@ fun NavegacionApp() {
 
         // Pantalla de REGISTRO
         composable(Rutas.REGISTRO) {
+            val viewModel = remember { VistaModeloUsuario() }
+
             PantallaRegistro(
+                viewModel = viewModel,
                 onRegistroExitoso = {
-                    // Si el registro fue exitoso, volvemos al inicio de sesión
                     navController.navigate(Rutas.INICIO_SESION) {
-                        popUpTo(Rutas.INICIO_SESION) { inclusive = true }
+                        popUpTo(Rutas.REGISTRO) { inclusive = true }
                     }
                 },
                 onIrAInicioSesion = {

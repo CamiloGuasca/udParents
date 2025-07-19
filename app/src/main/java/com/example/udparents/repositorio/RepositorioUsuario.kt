@@ -5,46 +5,53 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.example.udparents.modelo.Usuario
 import com.google.firebase.auth.FirebaseUser
 
-/**
- * Repositorio que maneja el registro de usuarios con Firebase Authentication y guarda los datos en Firestore.
- */
-class RepositorioAutenticacion {
+class RepositorioUsuario {
 
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 
-    /**
-     * Registra un usuario con correo y contraseña en Firebase Authentication.
-     * Luego guarda su nombre y correo en Firestore.
-     */
     fun registrarUsuario(
-        nombre: String,
-        correo: String,
-        contrasena: String,
+        usuario: Usuario,
         onResultado: (Boolean, String?) -> Unit
     ) {
-        auth.createUserWithEmailAndPassword(correo, contrasena)
+        auth.createUserWithEmailAndPassword(usuario.correo, usuario.contrasena)
             .addOnCompleteListener { tarea ->
                 if (tarea.isSuccessful) {
-                    val usuario = Usuario(nombre.trim(), correo.trim())
+                    val usuarioFirestore = Usuario(usuario.nombre.trim(), usuario.correo.trim())
 
                     db.collection("usuarios")
                         .document(auth.currentUser?.uid ?: "")
-                        .set(usuario)
+                        .set(usuarioFirestore)
                         .addOnSuccessListener {
                             onResultado(true, null)
                         }
                         .addOnFailureListener { error ->
-                            onResultado(false, "Error guardando datos: ${error.message}")
+                            onResultado(false, "Error guardando datos: ${'$'}{error.message}")
                         }
                 } else {
                     onResultado(false, tarea.exception?.message)
                 }
             }
     }
-    //NUEVO: Obtener el usuario actual
+
+
+    fun iniciarSesion(usuario: Usuario, onResultado: (Boolean, String?) -> Unit) {
+        auth.signInWithEmailAndPassword(usuario.correo, usuario.contrasena)
+            .addOnCompleteListener { tarea ->
+                if (tarea.isSuccessful) {
+                    val usuarioFirebase = auth.currentUser
+                    if (usuarioFirebase != null && usuarioFirebase.isEmailVerified) {
+                        onResultado(true, null)
+                    } else {
+                        onResultado(false, "Debes verificar tu correo.")
+                    }
+                } else {
+                    onResultado(false, tarea.exception?.localizedMessage)
+                }
+            }
+    }
+
     fun obtenerUsuarioActual(): FirebaseUser? {
         return auth.currentUser
     }
-
 }

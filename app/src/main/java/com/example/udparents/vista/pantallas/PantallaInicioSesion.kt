@@ -14,26 +14,29 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.udparents.R
-import com.example.udparents.utilidades.esCorreoValido
-import com.example.udparents.utilidades.esContrasenaValida
-import com.google.firebase.auth.FirebaseAuth
+import com.example.udparents.viewmodel.VistaModeloUsuario
 import kotlinx.coroutines.launch
 
 @Composable
 fun PantallaInicioSesion(
+    viewModel: VistaModeloUsuario = androidx.lifecycle.viewmodel.compose.viewModel(),
     onIniciarSesionExitoso: () -> Unit,
     onIrARegistro: () -> Unit,
-    onOlvidoContrasena: () -> Unit // ✅ ¡Este ya lo usarás desde la navegación!
+    onOlvidoContrasena: () -> Unit
 ) {
-    var correo by remember { mutableStateOf("") }
-    var contrasena by remember { mutableStateOf("") }
-
-    var errorCorreo by remember { mutableStateOf(false) }
-    var errorContrasena by remember { mutableStateOf(false) }
-
+    val usuario by viewModel.usuario.collectAsState()
+    val cargando by viewModel.cargando.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-    var cargando by remember { mutableStateOf(false) }
+
+    // Mostrar mensaje si hay error
+    val mensaje by viewModel.mensaje.collectAsState()
+    LaunchedEffect(mensaje) {
+        mensaje?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.limpiarMensaje()
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -63,81 +66,34 @@ fun PantallaInicioSesion(
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
-                value = correo,
-                onValueChange = {
-                    correo = it.trim()
-                    errorCorreo = false
-                },
+                value = usuario.correo,
+                onValueChange = { viewModel.actualizarCorreo(it) },
                 label = { Text("Correo") },
-                isError = errorCorreo,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
 
-            if (errorCorreo) {
-                Text(
-                    "Correo no válido",
-                    color = Color.Red,
-                    fontSize = 12.sp,
-                    modifier = Modifier.align(Alignment.Start)
-                )
-            }
-
             OutlinedTextField(
-                value = contrasena,
-                onValueChange = {
-                    contrasena = it.trim()
-                    errorContrasena = false
-                },
+                value = usuario.contrasena,
+                onValueChange = { viewModel.actualizarContrasena(it) },
                 label = { Text("Contraseña") },
-                isError = errorContrasena,
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth()
             )
 
-            if (errorContrasena) {
-                Text(
-                    "La contraseña debe tener al menos 6 caracteres",
-                    color = Color.Red,
-                    fontSize = 12.sp,
-                    modifier = Modifier.align(Alignment.Start)
-                )
-            }
-
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 onClick = {
-                    errorCorreo = !esCorreoValido(correo)
-                    errorContrasena = !esContrasenaValida(contrasena)
-
-                    if (!errorCorreo && !errorContrasena) {
-                        cargando = true
-                        FirebaseAuth.getInstance()
-                            .signInWithEmailAndPassword(correo, contrasena)
-                            .addOnCompleteListener { tarea ->
-                                cargando = false
-                                if (tarea.isSuccessful) {
-                                    val usuario = FirebaseAuth.getInstance().currentUser
-                                    if (usuario != null && usuario.isEmailVerified) {
-                                        onIniciarSesionExitoso()
-                                    } else {
-                                        coroutineScope.launch {
-                                            snackbarHostState.showSnackbar(
-                                                "Debes verificar tu correo antes de ingresar."
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar(
-                                            "Error: ${tarea.exception?.localizedMessage}"
-                                        )
-                                    }
-                                }
+                    viewModel.iniciarSesion(
+                        onExito = onIniciarSesionExitoso,
+                        onError = {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar(it)
                             }
-                    }
+                        }
+                    )
                 },
                 enabled = !cargando,
                 modifier = Modifier.fillMaxWidth(),
@@ -162,7 +118,7 @@ fun PantallaInicioSesion(
 
             Text(
                 text = "¿Olvidaste tu contraseña?",
-                modifier = Modifier.clickable { onOlvidoContrasena() }, // ✅ Este es el llamado
+                modifier = Modifier.clickable { onOlvidoContrasena() },
                 color = Color(0xFF003366)
             )
         }

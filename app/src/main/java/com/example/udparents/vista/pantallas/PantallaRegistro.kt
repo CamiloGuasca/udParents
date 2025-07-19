@@ -1,158 +1,111 @@
 package com.example.udparents.vista.pantallas
 
-import androidx.compose.foundation.Image
+import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.udparents.R
-import com.example.udparents.utilidades.campoNoVacio
-import com.example.udparents.utilidades.esCorreoValido
-import com.example.udparents.utilidades.esContrasenaValida
-import com.example.udparents.repositorio.RepositorioAutenticacion
+import com.example.udparents.viewmodel.VistaModeloUsuario
+import kotlinx.coroutines.delay
 
 @Composable
 fun PantallaRegistro(
+    viewModel: VistaModeloUsuario,
     onRegistroExitoso: () -> Unit,
     onIrAInicioSesion: () -> Unit
 ) {
-    var nombre by remember { mutableStateOf("") }
-    var correo by remember { mutableStateOf("") }
-    var contrasena by remember { mutableStateOf("") }
+    val usuario by viewModel.usuario.collectAsState()
+    val mensaje by viewModel.mensaje.collectAsState()
+    val cargando by viewModel.cargando.collectAsState()
+    val contexto = LocalContext.current
 
-    var errorNombre by remember { mutableStateOf(false) }
-    var errorCorreo by remember { mutableStateOf(false) }
-    var errorContrasena by remember { mutableStateOf(false) }
-
-    var mensajeError by remember { mutableStateOf<String?>(null) }
-
-    val repo = remember { RepositorioAutenticacion() }
-
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF003366))
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
+            .padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(
-            modifier = Modifier
-                .background(Color(0xFFE6E6E6), RoundedCornerShape(16.dp))
-                .padding(24.dp)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.person_24dp),
-                contentDescription = "Icono usuario",
-                modifier = Modifier
-                    .size(64.dp)
-                    .padding(bottom = 8.dp)
-            )
+        Text(
+            text = "Regístrate",
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
 
-            Text("Registro", fontSize = 22.sp, color = Color(0xFF003366))
+        OutlinedTextField(
+            value = usuario.nombre,
+            onValueChange = { viewModel.actualizarNombre(it) },
+            label = { Text("Nombre") },
+            modifier = Modifier.fillMaxWidth()
+        )
 
-            Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedTextField(
-                value = nombre,
-                onValueChange = {
-                    nombre = it
-                    errorNombre = false
-                },
-                label = { Text("Nombre") },
-                isError = errorNombre,
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+        OutlinedTextField(
+            value = usuario.correo,
+            onValueChange = { viewModel.actualizarCorreo(it) },
+            label = { Text("Correo electrónico") },
+            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Email),
+            modifier = Modifier.fillMaxWidth()
+        )
 
-            OutlinedTextField(
-                value = correo,
-                onValueChange = {
-                    correo = it
-                    errorCorreo = false
-                },
-                label = { Text("Correo") },
-                isError = errorCorreo,
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+        Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedTextField(
-                value = contrasena,
-                onValueChange = {
-                    contrasena = it
-                    errorContrasena = false
-                },
-                label = { Text("Contraseña (mínimo 6 caracteres)") },
-                isError = errorContrasena,
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
-            )
+        OutlinedTextField(
+            value = usuario.contrasena,
+            onValueChange = { viewModel.actualizarContrasena(it) },
+            label = { Text("Contraseña") },
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth()
+        )
 
-            Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-            Button(
-                onClick = {
-                    errorNombre = !campoNoVacio(nombre)
-                    errorCorreo = !esCorreoValido(correo)
-                    errorContrasena = !esContrasenaValida(contrasena)
-
-                    if (!errorNombre && !errorCorreo && !errorContrasena) {
-                        repo.registrarUsuario(
-                            nombre.trim(),
-                            correo.trim(),
-                            contrasena.trim()
-                        ) { exito, error ->
-                            if (exito) {
-                                val user = repo.obtenerUsuarioActual()
-                                user?.sendEmailVerification()
-                                    ?.addOnCompleteListener { verifyTask ->
-                                        if (verifyTask.isSuccessful) {
-                                            mensajeError = "✅ Registro exitoso. Revisa tu correo y verifica tu cuenta para continuar."
-                                        } else {
-                                            mensajeError = "⚠️ Registro exitoso, pero no se pudo enviar el correo de verificación."
-                                        }
-                                    }
-                            } else {
-                                mensajeError = error ?: "Ocurrió un error desconocido"
-                            }
-                        }
+        Button(
+            onClick = {
+                viewModel.registrarUsuario { exito, _ ->
+                    if (exito) {
+                        Toast.makeText(contexto, "Registro exitoso", Toast.LENGTH_SHORT).show()
+                        onRegistroExitoso()
                     }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF003366))
-            ) {
-                Text("Registrarse", color = Color.White)
-            }
+                }
+            },
+            enabled = !cargando,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(50),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF003366))
+        ) {
+            Text("Registrarse", color = Color.White)
+        }
 
+        Spacer(modifier = Modifier.height(12.dp))
+
+        TextButton(onClick = onIrAInicioSesion) {
+            Text("¿Ya tienes una cuenta? Inicia sesión")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        mensaje?.let {
             Spacer(modifier = Modifier.height(12.dp))
-
             Text(
-                text = "¿Ya tienes cuenta? Inicia sesión",
-                modifier = Modifier.clickable { onIrAInicioSesion() },
-                color = Color(0xFF003366)
+                text = it,
+                color = if (it.contains("✅")) Color(0xFF007F00) else Color.Red,
+                fontSize = 14.sp
             )
-
-            mensajeError?.let {
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = it,
-                    color = if (it.contains("✅")) Color(0xFF007F00) else Color.Red,
-                    fontSize = 14.sp
-                )
-            }
         }
     }
 }
