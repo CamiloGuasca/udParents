@@ -113,6 +113,7 @@ fun PantallaVinculacionHijo(
                 }
 
                 vistaModelo.vincularHijoConDatos(
+                    context = context,
                     codigo,
                     nombre,
                     edad.toIntOrNull() ?: 0,

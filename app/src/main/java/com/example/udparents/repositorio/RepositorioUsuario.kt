@@ -51,6 +51,16 @@ class RepositorioUsuario {
             }
     }
 
+    fun recuperarContrasena(usuario: Usuario, onResultado: (Boolean, String?) -> Unit) {
+        auth.sendPasswordResetEmail(usuario.correo)
+            .addOnCompleteListener { tarea ->
+                if (tarea.isSuccessful) {
+                    onResultado(true, null)
+                } else {
+                    onResultado(false, tarea.exception?.localizedMessage)
+                }
+            }
+    }
     fun obtenerUsuarioActual(): FirebaseUser? {
         return auth.currentUser
     }

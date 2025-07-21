@@ -1,5 +1,6 @@
 package com.example.udparents.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.udparents.modelo.CodigoVinculacion
@@ -9,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlin.random.Random
+import android.provider.Settings
+
 
 class VistaModeloVinculacion(
     private val repositorio: RepositorioVinculacion = RepositorioVinculacion()
@@ -93,6 +96,7 @@ class VistaModeloVinculacion(
     }
 
     fun vincularHijoConDatos(
+        context: Context,
         codigo: String,
         nombreHijo: String,
         edadHijo: Int,
@@ -114,9 +118,11 @@ class VistaModeloVinculacion(
                     return@launch
                 }
 
-                val idHijo = FirebaseAuth.getInstance().currentUser?.uid
-                if (idHijo.isNullOrBlank()) {
-                    onError("No se pudo obtener el ID del hijo. Asegúrate de que esté autenticado.")
+                val idHijo = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+
+                val yaVinculado = repositorio.dispositivoYaVinculado(idHijo)
+                if (yaVinculado) {
+                    onError("Este dispositivo ya ha sido vinculado previamente.")
                     return@launch
                 }
 

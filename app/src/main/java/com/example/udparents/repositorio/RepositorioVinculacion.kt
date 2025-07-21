@@ -77,4 +77,11 @@ class RepositorioVinculacion {
             .addOnSuccessListener { onResult(true) }
             .addOnFailureListener { onResult(false) }
     }
+    suspend fun dispositivoYaVinculado(idDispositivo: String): Boolean {
+        val snapshot = db.collection("codigos_vinculacion")
+            .whereEqualTo("dispositivoHijo", idDispositivo)
+            .get()
+            .await()
+        return !snapshot.isEmpty
+    }
 }

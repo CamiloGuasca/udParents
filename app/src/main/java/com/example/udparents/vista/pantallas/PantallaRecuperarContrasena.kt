@@ -12,15 +12,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.udparents.utilidades.esCorreoValido
+import com.example.udparents.viewmodel.VistaModeloUsuario
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 
 @Composable
 fun PantallaRecuperarContrasena(
+    viewModel: VistaModeloUsuario,
     onRecuperacionEnviada: () -> Unit,
     onVolver: () -> Unit
 ) {
-    var correo by remember { mutableStateOf("") }
+    val usuario by viewModel.usuario.collectAsState()
     var errorCorreo by remember { mutableStateOf(false) }
     var cargando by remember { mutableStateOf(false) }
 
@@ -46,11 +48,8 @@ fun PantallaRecuperarContrasena(
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
-                value = correo,
-                onValueChange = {
-                    correo = it.trim()
-                    errorCorreo = false
-                },
+                value = usuario.correo,
+                onValueChange = {viewModel.actualizarCorreo(it)},
                 label = { Text("Correo electrónico") },
                 isError = errorCorreo,
                 singleLine = true,
@@ -70,24 +69,17 @@ fun PantallaRecuperarContrasena(
 
             Button(
                 onClick = {
-                    errorCorreo = !esCorreoValido(correo)
-                    if (!errorCorreo) {
-                        cargando = true
-                        FirebaseAuth.getInstance()
-                            .sendPasswordResetEmail(correo)
-                            .addOnCompleteListener { task ->
-                                cargando = false
-                                if (task.isSuccessful) {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar("Correo enviado. Revisa tu bandeja.")
-                                    }
-                                    onRecuperacionEnviada()
-                                } else {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar("Error: ${task.exception?.localizedMessage}")
-                                    }
-                                }
+                    viewModel.recuperarContrasena { exito, error ->
+                        if (exito) {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Correo enviado. Revisa tu bandeja.")
                             }
+                            onRecuperacionEnviada()
+                        } else {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Error: $error")
+                            }
+                        }
                     }
                 },
                 enabled = !cargando,
@@ -97,6 +89,7 @@ fun PantallaRecuperarContrasena(
             ) {
                 Text(if (cargando) "Enviando..." else "Enviar correo", color = Color.White)
             }
+
 
             Spacer(modifier = Modifier.height(12.dp))
 

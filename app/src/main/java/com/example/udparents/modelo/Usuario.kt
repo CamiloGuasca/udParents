@@ -15,4 +15,7 @@ data class Usuario(
     fun esValidoParaLogin(): Boolean {
         return esCorreoValido(correo) && esContrasenaValida(contrasena)
     }
+    fun esValidoParaRecuperar(): Boolean {
+        return esCorreoValido(correo)
+    }
 }

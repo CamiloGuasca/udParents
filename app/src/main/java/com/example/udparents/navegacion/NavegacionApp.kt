@@ -76,7 +76,10 @@ fun NavegacionApp() {
             )
         }
         composable(Rutas.RECUPERAR) {
+            val viewModel = remember { VistaModeloUsuario() }
+
             PantallaRecuperarContrasena(
+                viewModel = viewModel,
                 onRecuperacionEnviada = {
                     navController.popBackStack(Rutas.INICIO_SESION, false)
                 },

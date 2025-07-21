@@ -76,6 +76,26 @@ class VistaModeloUsuario : ViewModel() {
             if (exito) onExito() else onError(mensaje ?: "Error desconocido")
         }
     }
+    fun recuperarContrasena( onResultado: (Boolean, String?) -> Unit) {
+        val usuarioActual = _usuario.value
+        if (!usuarioActual.esValidoParaRecuperar()) {
+            _mensaje.value = "Por favor completa los campos correctamente"
+            onResultado(false, _mensaje.value)
+            return
+        }
+        _cargando.value = true
+        repositorio.recuperarContrasena(usuarioActual) { exito, mensaje ->
+            _cargando.value = false
+            if (exito) {
+                _mensaje.value = "✅ Se ha enviado un correo para restablecer tu contraseña."
+                onResultado(true, _mensaje.value)
+            } else {
+                _mensaje.value = mensaje ?: "Error desconocido"
+                 onResultado(false, _mensaje.value)
+            }
+        }
+
+    }
     fun limpiarMensaje() {
         _mensaje.value = null
     }
