@@ -119,6 +119,11 @@ class VistaModeloVinculacion(
         viewModelScope.launch {
             try {
                 val codVinAct = _codigoVinculacion.value
+                if (codVinAct.dispositivoHijo.isBlank()) {
+                    onError("No se ha autenticado el dispositivo del hijo.")
+                    return@launch
+                }
+
                 val existe = repositorio.existeCodigo(codVinAct.codigo)
                 if (!existe) {
                     onError("Código no válido")
@@ -131,9 +136,7 @@ class VistaModeloVinculacion(
                     return@launch
                 }
 
-                val idHijo = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
-
-                val yaVinculado = repositorio.dispositivoYaVinculado(idHijo)
+                val yaVinculado = repositorio.dispositivoYaVinculado(codVinAct.dispositivoHijo)
                 if (yaVinculado) {
                     onError("Este dispositivo ya ha sido vinculado previamente.")
                     return@launch
@@ -151,5 +154,12 @@ class VistaModeloVinculacion(
             }
         }
     }
+
+    fun actualizarDispositivoHijo(uid: String?) {
+        uid?.let {
+            _codigoVinculacion.value = _codigoVinculacion.value.copy(dispositivoHijo = it)
+        }
+    }
+
 
 }

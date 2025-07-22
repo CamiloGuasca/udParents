@@ -92,7 +92,8 @@ fun NavegacionApp() {
             PantallaPrincipal(
                 onCerrarSesion = {
                     navController.navigate(Rutas.INICIO_SESION) {
-                        popUpTo(Rutas.INICIO_SESION) { inclusive = true }
+                        popUpTo(0) // Limpia toda la pila
+                        launchSingleTop = true
                     }
                 },
                 onIrAVinculacionPadre = {

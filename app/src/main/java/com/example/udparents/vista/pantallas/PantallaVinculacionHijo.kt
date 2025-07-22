@@ -23,13 +23,26 @@ fun PantallaVinculacionHijo(
     val context = LocalContext.current
     val activity = context as? Activity
 
-    // ✅ Autenticación anónima del hijo si aún no está autenticado
+    val auth = FirebaseAuth.getInstance()
+    var uidHijo by remember { mutableStateOf<String?>(auth.currentUser?.uid) }
+
     LaunchedEffect(Unit) {
-        val user = FirebaseAuth.getInstance().currentUser
-        if (user == null) {
-            FirebaseAuth.getInstance().signInAnonymously()
+        if (auth.currentUser == null) {
+            auth.signInAnonymously().addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val nuevoUid = auth.currentUser?.uid
+                    uidHijo = nuevoUid
+                    vistaModelo.actualizarDispositivoHijo(nuevoUid)
+                }
+            }
+        } else {
+            val nuevoUid = auth.currentUser?.uid
+            uidHijo = nuevoUid
+            vistaModelo.actualizarDispositivoHijo(nuevoUid)
         }
     }
+
+
 
     val codigoVinculacion by vistaModelo.codigoVinculacion.collectAsState()
     var codigo by remember { mutableStateOf("") }
