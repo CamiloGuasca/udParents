@@ -23,6 +23,22 @@ class VistaModeloVinculacion(
     private val _dispositivosVinculados = MutableStateFlow<List<CodigoVinculacion>>(emptyList())
     val dispositivosVinculados: StateFlow<List<CodigoVinculacion>> get() = _dispositivosVinculados
 
+    private val _codigoVinculacion = MutableStateFlow( CodigoVinculacion())
+    val codigoVinculacion: StateFlow<CodigoVinculacion?> = _codigoVinculacion
+
+
+    fun actualizarCodigo(codigo: String) {
+        _codigoVinculacion.value = _codigoVinculacion.value.copy(codigo = codigo.trim())
+    }
+    fun actualizarNombreHijo(nombreHijo: String) {
+        _codigoVinculacion.value = _codigoVinculacion.value.copy(nombreHijo = nombreHijo.trim())
+    }
+    fun actualizarEdadHijo(edadHijo: Int) {
+        _codigoVinculacion.value = _codigoVinculacion.value.copy(edadHijo = edadHijo)
+    }
+    fun actualizarSexoHijo(sexoHijo: String) {
+        _codigoVinculacion.value = _codigoVinculacion.value.copy(sexoHijo = sexoHijo.trim())
+    }
     fun generarCodigo(idPadre: String) {
         viewModelScope.launch {
             var nuevoCodigo: String
@@ -97,22 +113,19 @@ class VistaModeloVinculacion(
 
     fun vincularHijoConDatos(
         context: Context,
-        codigo: String,
-        nombreHijo: String,
-        edadHijo: Int,
-        sexoHijo: String,
         onExito: () -> Unit,
         onError: (String) -> Unit
     ) {
         viewModelScope.launch {
             try {
-                val existe = repositorio.existeCodigo(codigo)
+                val codVinAct = _codigoVinculacion.value
+                val existe = repositorio.existeCodigo(codVinAct.codigo)
                 if (!existe) {
                     onError("Código no válido")
                     return@launch
                 }
 
-                val esValido = repositorio.verificarCodigoValido(codigo)
+                val esValido = repositorio.verificarCodigoValido(codVinAct.codigo)
                 if (!esValido) {
                     onError("Código expirado")
                     return@launch
@@ -126,7 +139,7 @@ class VistaModeloVinculacion(
                     return@launch
                 }
 
-                repositorio.vincularConDatos(codigo, idHijo, nombreHijo, edadHijo, sexoHijo) { exito ->
+                repositorio.vincularConDatos(codVinAct) { exito ->
                     if (exito) {
                         onExito()
                     } else {

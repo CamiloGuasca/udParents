@@ -56,23 +56,19 @@ class RepositorioVinculacion {
     }
 
     fun vincularConDatos(
-        codigo: String,
-        idHijo: String,
-        nombreHijo: String,
-        edadHijo: Int,
-        sexoHijo: String,
+        codigoVinculacion: CodigoVinculacion,
         onResult: (Boolean) -> Unit
     ) {
         val datos = mapOf(
             "vinculado" to true,
-            "dispositivoHijo" to idHijo,
-            "nombreHijo" to nombreHijo,
-            "edadHijo" to edadHijo,
-            "sexoHijo" to sexoHijo
+            "dispositivoHijo" to codigoVinculacion.dispositivoHijo,
+            "nombreHijo" to codigoVinculacion.nombreHijo,
+            "edadHijo" to codigoVinculacion.edadHijo,
+            "sexoHijo" to codigoVinculacion.sexoHijo
         )
 
         db.collection("codigos_vinculacion")
-            .document(codigo)
+            .document(codigoVinculacion.codigo)
             .update(datos)
             .addOnSuccessListener { onResult(true) }
             .addOnFailureListener { onResult(false) }

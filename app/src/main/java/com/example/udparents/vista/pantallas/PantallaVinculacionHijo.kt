@@ -31,6 +31,7 @@ fun PantallaVinculacionHijo(
         }
     }
 
+    val codigoVinculacion by vistaModelo.codigoVinculacion.collectAsState()
     var codigo by remember { mutableStateOf("") }
     var nombre by remember { mutableStateOf("") }
     var edad by remember { mutableStateOf("") }
@@ -68,8 +69,8 @@ fun PantallaVinculacionHijo(
         Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
-            value = codigo,
-            onValueChange = { codigo = it },
+            value = codigoVinculacion?.codigo ?: "",
+            onValueChange = { vistaModelo.actualizarCodigo(it) },
             label = { Text("Código de vinculación") },
             keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
@@ -78,8 +79,8 @@ fun PantallaVinculacionHijo(
         Spacer(modifier = Modifier.height(8.dp))
 
         OutlinedTextField(
-            value = nombre,
-            onValueChange = { nombre = it },
+            value = codigoVinculacion?.nombreHijo ?: "",
+            onValueChange = { vistaModelo.actualizarNombreHijo(it) },
             label = { Text("Nombre del hijo") },
             modifier = Modifier.fillMaxWidth()
         )
@@ -87,8 +88,8 @@ fun PantallaVinculacionHijo(
         Spacer(modifier = Modifier.height(8.dp))
 
         OutlinedTextField(
-            value = edad,
-            onValueChange = { edad = it },
+            value = codigoVinculacion?.edadHijo.toString(),
+            onValueChange = { vistaModelo.actualizarEdadHijo(it.toIntOrNull() ?: 0) },
             label = { Text("Edad del hijo") },
             keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
@@ -97,8 +98,8 @@ fun PantallaVinculacionHijo(
         Spacer(modifier = Modifier.height(8.dp))
 
         OutlinedTextField(
-            value = sexo,
-            onValueChange = { sexo = it },
+            value = codigoVinculacion?.sexoHijo ?: "",
+            onValueChange = { vistaModelo.actualizarSexoHijo(it)},
             label = { Text("Sexo del hijo (M/F)") },
             modifier = Modifier.fillMaxWidth()
         )
@@ -107,17 +108,13 @@ fun PantallaVinculacionHijo(
 
         Button(
             onClick = {
-                if (codigo.isBlank() || nombre.isBlank() || edad.isBlank() || sexo.isBlank()) {
+                if (codigoVinculacion?.codigo.isNullOrBlank() || codigoVinculacion?.nombreHijo.isNullOrBlank() || codigoVinculacion?.edadHijo!! <= 0 || codigoVinculacion?.sexoHijo.isNullOrBlank()) {
                     mensajeError = "Por favor complete todos los campos."
                     return@Button
                 }
 
                 vistaModelo.vincularHijoConDatos(
                     context = context,
-                    codigo,
-                    nombre,
-                    edad.toIntOrNull() ?: 0,
-                    sexo,
                     onExito = {
                         mensajeError = ""
                         mostrarDialogoExito = true
