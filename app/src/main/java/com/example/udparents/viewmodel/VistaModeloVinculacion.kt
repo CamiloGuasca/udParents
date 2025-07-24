@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 import android.provider.Settings
+import com.example.udparents.utilidades.RegistroUsoApps
+
 
 
 class VistaModeloVinculacion(
@@ -144,11 +146,19 @@ class VistaModeloVinculacion(
 
                 repositorio.vincularConDatos(codVinAct) { exito ->
                     if (exito) {
-                        onExito()
+                        viewModelScope.launch {
+                            try {
+                                RegistroUsoApps.registrarUsoAplicaciones(context)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                            onExito()
+                        }
                     } else {
                         onError("No se pudo vincular el dispositivo.")
                     }
                 }
+
             } catch (e: Exception) {
                 onError("Error al procesar la vinculación: ${e.message}")
             }

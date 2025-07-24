@@ -1,11 +1,16 @@
 package com.example.udparents.navegacion
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.listSaver
 import com.example.udparents.viewmodel.VistaModeloUsuario
 import com.example.udparents.vista.pantallas.PantallaBienvenida
 import com.example.udparents.vista.pantallas.PantallaCodigoPadre
@@ -14,6 +19,7 @@ import com.example.udparents.vista.pantallas.PantallaInicioSesion
 import com.example.udparents.vista.pantallas.PantallaPrincipal
 import com.example.udparents.vista.pantallas.PantallaRegistro
 import com.example.udparents.vista.pantallas.PantallaRecuperarContrasena
+import com.example.udparents.vista.pantallas.PantallaReporteApps
 import com.example.udparents.vista.pantallas.PantallaVinculacionHijo
 
 /**
@@ -28,6 +34,8 @@ object Rutas {
     const val VINCULACION_HIJO = "vinculacion_hijo"
     const val BIENVENIDA = "bienvenida"
     const val DISPOSITIVOS_VINCULADOS = "dispositivos_vinculados"
+    const val REPORTE_APPS = "reporte_apps"
+
 
 }
 
@@ -92,7 +100,7 @@ fun NavegacionApp() {
             PantallaPrincipal(
                 onCerrarSesion = {
                     navController.navigate(Rutas.INICIO_SESION) {
-                        popUpTo(0) // Limpia toda la pila
+                        popUpTo(0)
                         launchSingleTop = true
                     }
                 },
@@ -101,8 +109,14 @@ fun NavegacionApp() {
                 },
                 onIrADispositivosVinculados = {
                     navController.navigate(Rutas.DISPOSITIVOS_VINCULADOS)
+                },
+                onIrAReporteApps = { hijos ->
+                    navController.currentBackStackEntry?.savedStateHandle?.set("hijosVinculados", hijos)
+                    navController.navigate(Rutas.REPORTE_APPS)
                 }
+
             )
+
         }
 
 
@@ -149,6 +163,21 @@ fun NavegacionApp() {
                 }
             )
         }
+
+        composable(Rutas.REPORTE_APPS) {
+            val hijos = navController.previousBackStackEntry
+                ?.savedStateHandle
+                ?.get<List<Pair<String, String>>>("hijosVinculados")
+                ?: emptyList()
+
+            PantallaReporteApps(
+                listaHijos = hijos,
+                onVolver = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
 
 
     }
