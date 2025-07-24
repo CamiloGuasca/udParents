@@ -1,4 +1,4 @@
-package com.example.udparents.ui.theme
+package com.example.udparents.tema
 
 import androidx.compose.ui.graphics.Color
 
