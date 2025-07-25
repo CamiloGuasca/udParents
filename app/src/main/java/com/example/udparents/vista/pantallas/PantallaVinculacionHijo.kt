@@ -20,10 +20,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.udparents.main.MainActivity
 import com.example.udparents.viewmodel.VistaModeloVinculacion
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
-import com.example.udparents.servicio.RegistroUsoService
+import kotlinx.coroutines.launch
 
 @Composable
 fun PantallaVinculacionHijo(
@@ -33,6 +34,7 @@ fun PantallaVinculacionHijo(
     val context = LocalContext.current
     val activity = context as? Activity
     val auth = FirebaseAuth.getInstance()
+    val coroutineScope = rememberCoroutineScope()
 
     var uidHijo by remember { mutableStateOf(auth.currentUser?.uid) }
     val permisoOtorgado = remember { mutableStateOf(verificarPermisoUsoApps(context)) }
@@ -41,23 +43,26 @@ fun PantallaVinculacionHijo(
     var mensajeError by remember { mutableStateOf("") }
     var mostrarDialogoPermiso by remember { mutableStateOf(false) }
     var mostrarDialogoExito by remember { mutableStateOf(false) }
-    var vinculacionCompleta by remember { mutableStateOf(false) }
+
+    // Bandera para saber si la vinculación se inició y estamos esperando el permiso
+    var vinculacionIniciadaYPermisoPendiente by remember { mutableStateOf(false) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(Unit) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                // Cuando la app vuelve de segundo plano (ej. después de dar permisos),
+                // verificamos de nuevo el permiso.
                 permisoOtorgado.value = verificarPermisoUsoApps(context)
 
-                if (permisoOtorgado.value && vinculacionCompleta && !mostrarDialogoExito) {
-                    mostrarDialogoExito = true
-
-                    // 🔁 Iniciar el servicio de registro de uso
-                    val intentServicio = Intent(context, RegistroUsoService::class.java)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        context.startForegroundService(intentServicio)
-                    } else {
-                        context.startService(intentServicio)
+                // Si el permiso se acaba de otorgar Y estábamos esperando por él
+                if (permisoOtorgado.value && vinculacionIniciadaYPermisoPendiente) {
+                    vinculacionIniciadaYPermisoPendiente = false // Resetea la bandera
+                    mostrarDialogoPermiso = false // Oculta el diálogo de permiso si estaba visible
+                    mostrarDialogoExito = true // Ahora sí, muestra el diálogo de éxito
+                    coroutineScope.launch {
+                        delay(3000) // Aumentado a 3 segundo para asegurar que el diálogo se muestre antes de cerrar
+                        activity?.finish() // Cierra la actividad principal
                     }
                 }
             }
@@ -84,15 +89,17 @@ fun PantallaVinculacionHijo(
         }
     }
 
-    // Diálogo para pedir permiso
+    // Diálogo para pedir permiso de uso de apps
     if (mostrarDialogoPermiso && !permisoOtorgado.value) {
         AlertDialog(
-            onDismissRequest = {},
+            onDismissRequest = { /* No se puede descartar sin otorgar permiso */ },
             title = { Text("Permiso requerido") },
-            text = { Text("Debes conceder acceso al uso de aplicaciones para poder registrar la actividad.") },
+            text = { Text("Debes conceder acceso al uso de aplicaciones para poder registrar la actividad del hijo.") },
             confirmButton = {
                 TextButton(onClick = {
                     context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                    // Después de abrir los ajustes, la app volverá a ON_RESUME,
+                    // donde se verificará si el permiso fue otorgado.
                 }) {
                     Text("Abrir ajustes")
                 }
@@ -100,27 +107,33 @@ fun PantallaVinculacionHijo(
         )
     }
 
-    // Diálogo de éxito
-    if (mostrarDialogoExito && permisoOtorgado.value) {
+    // Diálogo de éxito (modificado para cerrar la actividad)
+    if (mostrarDialogoExito && permisoOtorgado.value) { // Asegúrate de que el permiso esté otorgado para mostrar este diálogo
         AlertDialog(
-            onDismissRequest = {},
+            onDismissRequest = {
+                // Al descartar el diálogo, cerramos la actividad
+                mostrarDialogoExito = false
+                activity?.finish()
+            },
             title = { Text("Vinculación exitosa") },
-            text = { Text("El dispositivo ha sido vinculado correctamente.") },
+            text = { Text("El dispositivo ha sido vinculado correctamente. La aplicación se cerrará.") },
             confirmButton = {
-                TextButton(onClick = { activity?.finish() }) {
+                TextButton(onClick = {
+                    mostrarDialogoExito = false
+                    activity?.finish() // Cierra la actividad principal
+                }) {
                     Text("Cerrar")
                 }
             }
         )
-
-        // También cerrar automáticamente en 3 segundos
+        // Este LaunchedEffect se mantiene para el cierre automático después de un tiempo
+        // si el usuario no interactúa con el diálogo.
         LaunchedEffect(Unit) {
-            delay(3000)
-            activity?.finish()
+            delay(5000) // Aumentado a 5 segundos (5000 milisegundos)
+            activity?.finish() // Cierra la actividad principal
         }
     }
 
-    // UI
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -179,23 +192,19 @@ fun PantallaVinculacionHijo(
                     return@Button
                 }
 
+                // Vincula primero y luego inicia el servicio si se tiene permiso
                 vistaModelo.vincularHijoConDatos(
                     context = context,
                     onExito = {
                         mensajeError = ""
-                        vinculacionCompleta = true
                         if (!permisoOtorgado.value) {
-                            mostrarDialogoPermiso = true
+                            mostrarDialogoPermiso = true // Muestra el diálogo para pedir permiso
+                            vinculacionIniciadaYPermisoPendiente = true // Establece la nueva bandera
                         } else {
+                            // Si el permiso ya está otorgado, muestra el diálogo de éxito
                             mostrarDialogoExito = true
-
-                            // 🔁 Iniciar servicio si ya hay permiso
-                            val intentServicio = Intent(context, RegistroUsoService::class.java)
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                context.startForegroundService(intentServicio)
-                            } else {
-                                context.startService(intentServicio)
-                            }
+                            // Inicia el servicio de registro de uso
+                            (activity as? MainActivity)?.iniciarServicioRegistroUso(context)
                         }
                     },
                     onError = { mensajeError = it }
@@ -219,7 +228,6 @@ fun PantallaVinculacionHijo(
     }
 }
 
-// ✅ Verifica si el permiso de uso de apps está habilitado
 fun verificarPermisoUsoApps(context: Context): Boolean {
     val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
     val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

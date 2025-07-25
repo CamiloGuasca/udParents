@@ -42,6 +42,7 @@ android {
 
 dependencies {
 
+    // Dependencias de AndroidX y Compose
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -50,15 +51,26 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-    implementation(libs.firebase.auth.ktx)
+
+    // Dependencias de Navegación (Compose)
     implementation(libs.androidx.navigation.runtime.android)
     implementation("androidx.navigation:navigation-compose:2.9.1")
+
+    // Dependencias de Lifecycle (Compose)
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.2")
-    implementation("androidx.compose.material3:material3:1.2.1")
-    implementation("androidx.compose.material:material:1.5.4")
-    implementation("androidx.compose.runtime:runtime-livedata:1.5.4")
-    implementation(libs.ads.mobile.sdk)
+
+    // Firebase BOM: Gestiona las versiones de todas las librerías de Firebase
+    // ¡Esta línea es CRÍTICA y debe estar presente UNA SOLA VEZ!
+    implementation(platform("com.google.firebase:firebase-bom:33.1.0")) // Asegúrate de que esta sea la versión más reciente
+
+    // Declaraciones de librerías de Firebase (SIN versión, ya que la BOM las maneja)
+    implementation(libs.firebase.auth.ktx)
     implementation(libs.firebase.firestore.ktx)
+
+    // Dependencia de Google Mobile Ads SDK
+    implementation(libs.ads.mobile.sdk)
+
+    // Dependencias de testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -67,4 +79,3 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 }
-
