@@ -48,5 +48,35 @@
                 if (uid != null) Pair(uid, nombre) else null
             }
         }
+        suspend fun bloquearApp(uidHijo: String, paquete: String, bloquear: Boolean) {
+            try {
+                val ref = db.collection("bloqueos")
+                    .document(uidHijo)
+                    .collection("apps")
+                    .document(paquete)
+
+                val datos = mapOf("bloqueada" to bloquear)
+                ref.set(datos).await()
+            } catch (e: Exception) {
+                e.printStackTrace() // Puedes manejar esto con logs o mostrar error en UI
+            }
+        }
+
+        // Consulta si una app está bloqueada para un hijo
+        suspend fun estaAppBloqueada(uidHijo: String, paquete: String): Boolean {
+            return try {
+                val snapshot = db.collection("bloqueos")
+                    .document(uidHijo)
+                    .collection("apps")
+                    .document(paquete)
+                    .get()
+                    .await()
+
+                snapshot.getBoolean("bloqueada") == true
+            } catch (e: Exception) {
+                e.printStackTrace()
+                false // Si falla la consulta, asumimos que no está bloqueada
+            }
+        }
 
     }

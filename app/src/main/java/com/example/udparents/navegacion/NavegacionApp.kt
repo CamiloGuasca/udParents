@@ -14,12 +14,14 @@ import androidx.compose.runtime.saveable.listSaver
 import com.example.udparents.viewmodel.VistaModeloUsuario
 import com.example.udparents.vista.pantallas.PantallaBienvenida
 import com.example.udparents.vista.pantallas.PantallaCodigoPadre
+import com.example.udparents.vista.pantallas.PantallaControlApps
 import com.example.udparents.vista.pantallas.PantallaDispositivosVinculados
 import com.example.udparents.vista.pantallas.PantallaInicioSesion
 import com.example.udparents.vista.pantallas.PantallaPrincipal
 import com.example.udparents.vista.pantallas.PantallaRegistro
 import com.example.udparents.vista.pantallas.PantallaRecuperarContrasena
 import com.example.udparents.vista.pantallas.PantallaReporteApps
+import com.example.udparents.vista.pantallas.PantallaSeleccionHijoParaControl
 import com.example.udparents.vista.pantallas.PantallaVinculacionHijo
 
 /**
@@ -35,7 +37,7 @@ object Rutas {
     const val BIENVENIDA = "bienvenida"
     const val DISPOSITIVOS_VINCULADOS = "dispositivos_vinculados"
     const val REPORTE_APPS = "reporte_apps"
-
+    const val CONTROL_APPS = "control_apps"
 
 }
 
@@ -111,9 +113,20 @@ fun NavegacionApp() {
                     navController.navigate(Rutas.DISPOSITIVOS_VINCULADOS)
                 },
                 onIrAReporteApps = { hijos ->
-                    navController.currentBackStackEntry?.savedStateHandle?.set("hijosVinculados", hijos)
+                    navController.currentBackStackEntry?.savedStateHandle?.set(
+                        "hijosVinculados",
+                        hijos
+                    )
                     navController.navigate(Rutas.REPORTE_APPS)
+                },
+                onIrAControlApps = { hijos ->
+                    navController.currentBackStackEntry?.savedStateHandle?.set(
+                        "hijosVinculados",
+                        hijos
+                    )
+                    navController.navigate(Rutas.CONTROL_APPS)
                 }
+
 
             )
 
@@ -178,6 +191,31 @@ fun NavegacionApp() {
             )
         }
 
+        composable(Rutas.CONTROL_APPS) {
+            val hijos = navController.previousBackStackEntry
+                ?.savedStateHandle
+                ?.get<List<Pair<String, String>>>("hijosVinculados")
+                ?: emptyList()
+
+            if (hijos.isNotEmpty()) {
+                // Muestra una pantalla simple para elegir el hijo antes de mostrar control de apps
+                PantallaSeleccionHijoParaControl(
+                    listaHijos = hijos,
+                    onHijoSeleccionado = { uidHijo ->
+                        navController.navigate("control_apps/$uidHijo")
+                    },
+                    onVolver = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+        }
+
+// Pantalla de control de apps con UID del hijo
+        composable("control_apps/{uidHijo}") { backStackEntry ->
+            val uidHijo = backStackEntry.arguments?.getString("uidHijo") ?: ""
+            PantallaControlApps(uidHijo = uidHijo)
+        }
 
 
     }

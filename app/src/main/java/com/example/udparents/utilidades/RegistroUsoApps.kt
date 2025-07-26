@@ -11,6 +11,9 @@ import com.example.udparents.repositorio.RepositorioApps
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import android.content.Intent
+import com.example.udparents.vista.pantallas.PantallaBloqueoComposeActivity
+import kotlinx.coroutines.runBlocking
 import android.app.usage.UsageStats
 
 
@@ -42,6 +45,23 @@ object RegistroUsoApps {
                 val tiempoUso = app.totalTimeInForeground
                 if (tiempoUso > 0) {
                     val nombreApp = obtenerNombreApp(context, app.packageName)
+
+                    // 🔒 Validación de bloqueo
+                    val estaBloqueada = runBlocking {
+                        repositorio.estaAppBloqueada(uidHijo, app.packageName)
+                    }
+
+                    if (estaBloqueada) {
+                        Log.i("RegistroUsoApps", "🔒 App bloqueada detectada: ${app.packageName}")
+                        val intent = Intent(context, com.example.udparents.vista.pantallas.PantallaBloqueoComposeActivity::class.java).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            putExtra("nombreApp", nombreApp)
+                        }
+                        context.startActivity(intent)
+                        return@withContext // ❌ NO registrar ni continuar con esa app
+                    }
+
+                    // ✅ Registrar uso si no está bloqueada
                     val appUso = AppUso(
                         nombrePaquete = app.packageName,
                         nombreApp = nombreApp,
@@ -53,6 +73,7 @@ object RegistroUsoApps {
             }
         }
     }
+
 
     private fun obtenerNombreApp(context: Context, packageName: String): String {
         return try {

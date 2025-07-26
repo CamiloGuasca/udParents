@@ -19,6 +19,7 @@ fun PantallaPrincipal(
     onCerrarSesion: () -> Unit,
     onIrAVinculacionPadre: () -> Unit,
     onIrAReporteApps: (List<Pair<String, String>>) -> Unit,
+    onIrAControlApps: (List<Pair<String, String>>) -> Unit,
     onIrADispositivosVinculados: () -> Unit
 ) {
     val vistaModelo: VistaModeloApps = viewModel()
@@ -82,7 +83,17 @@ fun PantallaPrincipal(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = { onIrAControlApps(hijosVinculados) },
+                enabled = hijosVinculados.isNotEmpty(),
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF99CCFF)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Control de aplicaciones", color = Color.White)
+            }
 
+            Spacer(modifier = Modifier.height(16.dp))
             Button(
                 onClick = {
                     FirebaseAuth.getInstance().signOut()

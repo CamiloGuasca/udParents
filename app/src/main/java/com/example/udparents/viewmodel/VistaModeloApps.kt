@@ -17,6 +17,8 @@ class VistaModeloApps : ViewModel() {
     val listaUsos: StateFlow<List<AppUso>> = _listaUsos
     private val _hijosVinculados = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val hijosVinculados: StateFlow<List<Pair<String, String>>> = _hijosVinculados
+    private val _estadoBloqueoApp = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    val estadoBloqueoApp: StateFlow<Map<String, Boolean>> = _estadoBloqueoApp
 
     fun cargarUsos(idHijo: String, desde: Long, hasta: Long) {
         viewModelScope.launch {
@@ -35,5 +37,27 @@ class VistaModeloApps : ViewModel() {
             _hijosVinculados.value = hijos
         }
     }
+
+    // Cambia el estado de bloqueo (true para bloquear, false para desbloquear)
+    fun cambiarEstadoBloqueo(uidHijo: String, paquete: String, bloquear: Boolean) {
+        viewModelScope.launch {
+            repositorio.bloquearApp(uidHijo, paquete, bloquear)
+            // Actualizar el estado local (opcional, para reflejar en UI)
+            _estadoBloqueoApp.value = _estadoBloqueoApp.value.toMutableMap().apply {
+                put(paquete, bloquear)
+            }
+        }
+    }
+
+    // Verifica si una app está bloqueada y actualiza el estado local
+    fun verificarSiEstaBloqueada(uidHijo: String, paquete: String) {
+        viewModelScope.launch {
+            val estaBloqueada = repositorio.estaAppBloqueada(uidHijo, paquete)
+            _estadoBloqueoApp.value = _estadoBloqueoApp.value.toMutableMap().apply {
+                put(paquete, estaBloqueada)
+            }
+        }
+    }
+
 
 }
