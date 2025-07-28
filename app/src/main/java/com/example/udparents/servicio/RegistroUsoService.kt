@@ -23,7 +23,7 @@ class RegistroUsoService : Service() {
     private var tareaMonitoreo: Job? = null
     private var tareaRegistroUso: Job? = null // Nueva tarea para el registro de uso en Firebase
     private val intervaloChequeoAppEnUso = 3000L // 3 segundos para el chequeo de bloqueo
-    private val intervaloRegistroUso = 5 * 60 * 1000L // 5 minutos para registrar el uso en Firebase
+    private val intervaloRegistroUso = 30 * 1000L // 5 minutos para registrar el uso en Firebase
     private var paqueteBloqueadoActual: String? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
