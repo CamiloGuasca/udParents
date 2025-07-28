@@ -2,7 +2,10 @@ package com.example.udparents.utilidades
 import android.app.AppOpsManager
 import android.content.Context
 import android.os.Process
-import android.provider.Settings
+// No es necesario importar Settings ni PantallaBloqueoComposeActivity si no se utilizan para el bloqueo.
+// import android.provider.Settings
+// import android.content.Intent
+// import com.example.udparents.vista.pantallas.PantallaBloqueoComposeActivity
 import android.app.usage.UsageStatsManager
 import android.content.pm.PackageManager
 import android.util.Log
@@ -11,9 +14,7 @@ import com.example.udparents.repositorio.RepositorioApps
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import android.content.Intent
-import com.example.udparents.vista.pantallas.PantallaBloqueoComposeActivity
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.runBlocking // Esto se eliminará ya que no necesitamos bloquear hilos
 import android.app.usage.UsageStats
 
 
@@ -25,16 +26,16 @@ object RegistroUsoApps {
             context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
 
         val ahora = System.currentTimeMillis()
-        val hace24h = ahora - (24 * 60 * 60 * 1000)
+        val hace24h = ahora - (24 * 60 * 60 * 1000) // Se mantiene el rango de 24 horas para el registro de uso.
 
         val stats: List<UsageStats> = usageStatsManager.queryUsageStats(
-            UsageStatsManager.INTERVAL_DAILY,
+            UsageStatsManager.INTERVAL_DAILY, // o puedes considerar INTERVAL_BEST/INTERVAL_CONFIG para más granularidad si es necesario.
             hace24h,
             ahora
         )
 
         if (stats.isNullOrEmpty()) {
-            Log.w("RegistroUsoApps", "Sin permisos o sin datos de uso.")
+            Log.w("RegistroUsoApps", "Sin permisos de uso o sin datos de uso para registrar.")
             return
         }
 
@@ -46,22 +47,11 @@ object RegistroUsoApps {
                 if (tiempoUso > 0) {
                     val nombreApp = obtenerNombreApp(context, app.packageName)
 
-                    // 🔒 Validación de bloqueo
-                    val estaBloqueada = runBlocking {
-                        repositorio.estaAppBloqueada(uidHijo, app.packageName)
-                    }
+                    // ¡IMPORTANTE! Hemos eliminado la lógica de bloqueo de apps de aquí.
+                    // Esta es responsabilidad exclusiva de RegistroUsoService.
+                    // Este método es SÓLO para registrar el uso.
 
-                    if (estaBloqueada) {
-                        Log.i("RegistroUsoApps", "🔒 App bloqueada detectada: ${app.packageName}")
-                        val intent = Intent(context, com.example.udparents.vista.pantallas.PantallaBloqueoComposeActivity::class.java).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                            putExtra("nombreApp", nombreApp)
-                        }
-                        context.startActivity(intent)
-                        return@withContext // ❌ NO registrar ni continuar con esa app
-                    }
-
-                    // ✅ Registrar uso si no está bloqueada
+                    // ✅ Registrar uso en Firebase
                     val appUso = AppUso(
                         nombrePaquete = app.packageName,
                         nombreApp = nombreApp,
@@ -73,7 +63,6 @@ object RegistroUsoApps {
             }
         }
     }
-
 
     private fun obtenerNombreApp(context: Context, packageName: String): String {
         return try {

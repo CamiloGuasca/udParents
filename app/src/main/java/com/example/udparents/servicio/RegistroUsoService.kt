@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.udparents.R
 import com.example.udparents.repositorio.RepositorioApps
+import com.example.udparents.utilidades.RegistroUsoApps // Asegúrate de que esta importación sea correcta
 import com.example.udparents.vista.pantallas.PantallaBloqueoComposeActivity
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.*
@@ -20,7 +21,9 @@ class RegistroUsoService : Service() {
 
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private var tareaMonitoreo: Job? = null
-    private val intervaloChequeo = 3000L // cada 3 segundos
+    private var tareaRegistroUso: Job? = null // Nueva tarea para el registro de uso en Firebase
+    private val intervaloChequeoAppEnUso = 3000L // 3 segundos para el chequeo de bloqueo
+    private val intervaloRegistroUso = 5 * 60 * 1000L // 5 minutos para registrar el uso en Firebase
     private var paqueteBloqueadoActual: String? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -28,6 +31,7 @@ class RegistroUsoService : Service() {
         Log.d("RegistroUsoService", "🧬 Servicio sigue corriendo tras cierre")
         mostrarNotificacion()
 
+        // Monitoreo de apps en uso para bloqueo (alta frecuencia)
         tareaMonitoreo = scope.launch {
             while (isActive) {
                 try {
@@ -35,7 +39,21 @@ class RegistroUsoService : Service() {
                 } catch (e: Exception) {
                     Log.e("RegistroUsoService", "❌ Error monitoreando apps: ${e.message}")
                 }
-                delay(intervaloChequeo)
+                delay(intervaloChequeoAppEnUso)
+            }
+        }
+
+        // Registro periódico del uso de apps en Firebase (baja frecuencia)
+        tareaRegistroUso = scope.launch {
+            while (isActive) {
+                try {
+                    Log.d("RegistroUsoService", "📝 Iniciando registro periódico de uso de apps en Firebase...")
+                    RegistroUsoApps.registrarUsoAplicaciones(applicationContext)
+                    Log.d("RegistroUsoService", "✅ Registro periódico de uso de apps finalizado.")
+                } catch (e: Exception) {
+                    Log.e("RegistroUsoService", "❌ Error registrando uso de apps: ${e.message}")
+                }
+                delay(intervaloRegistroUso)
             }
         }
 
@@ -50,7 +68,7 @@ class RegistroUsoService : Service() {
         val hace10Segundos = ahora - 10_000
 
         val stats: List<UsageStats> = usageStatsManager.queryUsageStats(
-            UsageStatsManager.INTERVAL_DAILY,
+            UsageStatsManager.INTERVAL_DAILY, // Puedes ajustar este intervalo si es necesario para una mejor precisión
             hace10Segundos,
             ahora
         )
@@ -64,12 +82,16 @@ class RegistroUsoService : Service() {
 
         val bloqueada = repositorio.estaAppBloqueada(uidHijo, paqueteActual)
         if (bloqueada) {
+            // Solo lanza la pantalla de bloqueo si la app es diferente a la que ya está bloqueada
+            // Esto evita el bucle de relanzamiento de la misma pantalla.
             if (paqueteActual != paqueteBloqueadoActual) {
                 paqueteBloqueadoActual = paqueteActual
                 val nombreApp = obtenerNombreApp(context, paqueteActual)
                 Log.d("RegistroUsoService", "🔒 App bloqueada detectada: $nombreApp ($paqueteActual)")
 
                 val intent = Intent(context, PantallaBloqueoComposeActivity::class.java).apply {
+                    // FLAG_ACTIVITY_NEW_TASK es crucial para lanzar una actividad desde un contexto que no es una actividad
+                    // FLAG_ACTIVITY_CLEAR_TOP asegura que si la actividad ya está en la pila, se suba a la cima y se eliminen las de arriba.
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                     putExtra("nombreApp", nombreApp)
                     putExtra("paqueteBloqueado", paqueteActual)
@@ -77,6 +99,8 @@ class RegistroUsoService : Service() {
                 context.startActivity(intent)
             }
         } else {
+            // Si la app actual no está bloqueada y teníamos una app bloqueada previamente,
+            // significa que el bloqueo se levantó o la app cambió.
             if (paqueteBloqueadoActual != null) {
                 Log.d("RegistroUsoService", "✅ App desbloqueada: $paqueteActual")
             }
@@ -99,6 +123,7 @@ class RegistroUsoService : Service() {
         Log.w("RegistroUsoService", "🛑 Servicio detenido inesperadamente")
         scope.cancel()
         tareaMonitoreo?.cancel()
+        tareaRegistroUso?.cancel() // ¡Importante: cancelar la nueva tarea también!
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -129,8 +154,10 @@ class RegistroUsoService : Service() {
 
         startForeground(1, notificacion)
     }
+
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
+        // Reinicia el servicio si la tarea es eliminada para asegurar el monitoreo continuo.
         val restartService = Intent(applicationContext, RegistroUsoService::class.java)
         restartService.setPackage(packageName)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
