@@ -1,4 +1,5 @@
 package com.example.udparents.utilidades
+
 import android.app.AppOpsManager
 import android.content.Context
 import android.os.Process
@@ -42,7 +43,6 @@ object RegistroUsoApps {
             ahora
         )
 
-        // *** LOGS DE DEPURACIÓN CRÍTICOS ***
         if (stats.isNullOrEmpty()) {
             Log.w(TAG, "Sin permisos de uso o sin datos de uso para el día actual. `usageStatsManager.queryUsageStats` devolvió vacío.")
             if (!tienePermisoUsageStats(context)) {
@@ -62,27 +62,23 @@ object RegistroUsoApps {
                 val tiempoUso = app.totalTimeInForeground
                 val packageName = app.packageName
 
-                // Ignorar la propia aplicación para evitar bucles o registros innecesarios
                 if (packageName == context.packageName) {
                     Log.d(TAG, "➡️ Ignorando la propia aplicación: $packageName")
                     continue
                 }
 
-                // *** LOG DE FILTRADO - Tiempo de uso ***
                 if (tiempoUso <= 0) {
                     Log.d(TAG, "➡️ Ignorando app sin tiempo en primer plano: $packageName (Tiempo: ${tiempoUso} ms)")
-                    continue // Salta apps sin tiempo de uso en primer plano
+                    continue
                 }
 
-                // *** LOG DE FILTRADO - Aplicaciones del sistema ***
-                // La lógica de esAplicacionSistema ha sido ajustada para este caso
                 if (esAplicacionSistema(context, packageName)) {
                     Log.d(TAG, "➡️ Ignorando app del sistema: $packageName")
-                    continue // Salta apps del sistema
+                    continue
                 }
 
-                // Si llega aquí, la app debería registrarse
-                val nombreApp = obtenerNombreApp(context, packageName)
+                val nombreAppRaw = obtenerNombreApp(context, packageName)
+                val nombreApp = if (nombreAppRaw == packageName) "Aplicación desconocida" else nombreAppRaw
                 Log.d(TAG, "✅ Lista para registrar: $nombreApp ($packageName), Tiempo: ${tiempoUso} ms")
 
                 val appUso = AppUso(
@@ -109,34 +105,29 @@ object RegistroUsoApps {
             val appInfo = pm.getApplicationInfo(packageName, 0)
             pm.getApplicationLabel(appInfo).toString()
         } catch (e: PackageManager.NameNotFoundException) {
-            packageName // Si no se encuentra el nombre, usar el paquete como fallback
+            packageName
         }
     }
 
     private fun esAplicacionSistema(context: Context, packageName: String): Boolean {
-        // Lista de paquetes que se EXCLUIRÁN explícitamente del monitoreo.
-        // Aquí debes incluir aplicaciones que NO quieres ver nunca en el historial,
-        // por ser puramente del sistema y sin interacción directa del usuario.
-        // Ejemplos: "android" (el propio sistema), "com.google.android.gms" (servicios de Google Play).
         val excludedPackages = setOf(
             "android",
             "com.google.android.gms",
             "com.android.providers.media",
             "com.android.systemui",
             "com.google.android.packageinstaller",
-            "com.google.android.permissioncontroller", // Controlador de permisos
-            "com.android.phone", // Aplicación de teléfono (llamadas, etc.)
-            "com.android.providers.telephony", // Proveedor de telefonía
-            "com.android.settings", // Configuración
-            "com.samsung.android.app.launcher", // Launcher de Samsung
-            "com.google.android.apps.restore", // Restauración de datos
-            "com.google.android.networkstack", // Componentes de red
-            "com.google.android.networkstack.tethering", // Componentes de red (tethering)
-            "com.sec.android.app.samsungapps", // Samsung Galaxy Store
-            "com.google.android.webview", // Componente WebView de Android
-            "com.sec.imsservice", // Servicio de IMS (VoLTE/VoWiFi)
-            "com.samsung.android.honeyboard" // Teclado Samsung (si no lo quieres monitorear)
-            // Agrega más paquetes aquí si encuentras otras apps del sistema que no te interesan
+            "com.google.android.permissioncontroller",
+            "com.android.phone",
+            "com.android.providers.telephony",
+            "com.android.settings",
+            "com.samsung.android.app.launcher",
+            "com.google.android.apps.restore",
+            "com.google.android.networkstack",
+            "com.google.android.networkstack.tethering",
+            "com.sec.android.app.samsungapps",
+            "com.google.android.webview",
+            "com.sec.imsservice",
+            "com.samsung.android.honeyboard"
         )
 
         if (excludedPackages.contains(packageName)) {
@@ -145,36 +136,16 @@ object RegistroUsoApps {
         }
 
         return try {
-            val pm = context.packageManager
-            val appInfo = pm.getApplicationInfo(packageName, 0)
-
-            // La lógica ahora es: si NO está en la lista de exclusión explícita, entonces
-            // DEBEMOS registrarla, independientemente de si es SYSTEM_APP o UPDATED_SYSTEM_APP.
-            // Solo nos interesan las apps que el usuario interactúa.
-
-            // La única excepción sería si una app es una PURE SYSTEM APP Y tiene un nombre de paquete
-            // que NO es de interés para el monitoreo de uso del usuario (ej: servicios en segundo plano).
-            // Pero como ya tenemos la lista de exclusión explícita, esa es la principal herramienta.
-            // Si quieres monitorear la cámara, calendario, etc., entonces esta función
-            // debe devolver 'false' para ellos.
-
-            // Por lo tanto, si no está en excludedPackages, simplemente retornamos false aquí.
-            // La única condición adicional que podrías agregar es si el tiempoInForeground es 0,
-            // pero eso ya se maneja fuera de esta función.
-
-            false // Si no está en la lista de exclusión, no la consideramos "del sistema a ignorar".
-
+            context.packageManager.getApplicationInfo(packageName, 0)
+            false
         } catch (e: PackageManager.NameNotFoundException) {
-            // Si el paquete no se encuentra, NO asumimos que es del sistema.
-            // Esto permite que el registro intente procesarla.
             Log.w(TAG, "esAplicacionSistema: Paquete no encontrado al verificar si es del sistema: $packageName. NO lo consideramos app del sistema para fines de registro. Error: ${e.message}")
-            false // NO la consideramos del sistema, para que pueda ser registrada
+            false
         } catch (e: Exception) {
             Log.e(TAG, "esAplicacionSistema: Error inesperado al verificar paquete $packageName: ${e.message}", e)
-            true // En caso de cualquier otro error grave, es más seguro no registrarla.
+            true
         }
     }
-
 
     fun tienePermisoUsageStats(context: Context): Boolean {
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager

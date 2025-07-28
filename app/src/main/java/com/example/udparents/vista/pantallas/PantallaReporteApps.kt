@@ -29,6 +29,8 @@ fun formatoTiempo(ms: Long): String {
     }
 }
 
+// ... (imports igual)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaReporteApps(
@@ -172,7 +174,6 @@ fun PantallaReporteApps(
         if (usos.isEmpty()) {
             Text("No se encontraron datos en el rango seleccionado.")
         } else {
-            // Tiempo total
             val totalMs = usos.sumOf { it.tiempoUso }
             Text("⏱ Tiempo total de uso: ${formatoTiempo(totalMs)}")
             Spacer(Modifier.height(16.dp))
@@ -194,8 +195,8 @@ fun PantallaReporteApps(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                         ) {
                             Column(Modifier.padding(12.dp)) {
-                                Text("📱 App: ${app.nombreApp}", style = MaterialTheme.typography.titleMedium)
-                                Text("📦 Paquete: ${app.nombrePaquete}")
+                                Text(app.nombreApp, style = MaterialTheme.typography.titleMedium)
+                                Text("(${app.nombrePaquete})", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text("🕒 Fecha: ${dateFormat.format(Date(app.fechaUso))}")
                                 Text("⏱ Tiempo de uso: ${formatoTiempo(app.tiempoUso)}")
                             }

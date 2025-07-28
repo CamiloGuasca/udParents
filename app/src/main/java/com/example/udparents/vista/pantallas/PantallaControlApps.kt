@@ -19,22 +19,21 @@ fun PantallaControlApps(
     val usosApps by vistaModeloApps.listaUsos.collectAsState()
     val estadosBloqueo by vistaModeloApps.estadoBloqueoApp.collectAsState()
 
-    // Cargar los usos de apps de este hijo al entrar
     LaunchedEffect(uidHijo) {
         val ahora = System.currentTimeMillis()
         val hace7Dias = ahora - (7 * 24 * 60 * 60 * 1000)
         vistaModeloApps.cargarUsos(uidHijo, hace7Dias, ahora)
-
     }
 
-    // Una vez los usos se cargan, verificar el estado de cada app
     LaunchedEffect(usosApps) {
         usosApps.forEach {
             vistaModeloApps.verificarSiEstaBloqueada(uidHijo, it.nombrePaquete)
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .padding(16.dp)) {
         Text("Control de Aplicaciones", style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -54,7 +53,8 @@ fun PantallaControlApps(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(app.nombreApp, style = MaterialTheme.typography.bodyLarge)
-                        Text("Paquete: ${app.nombrePaquete}", style = MaterialTheme.typography.bodySmall)
+                        // Ya no mostramos el nombre del paquete para mantener la vista limpia
+                        // Text("Paquete: ${app.nombrePaquete}", style = MaterialTheme.typography.bodySmall)
                     }
 
                     Switch(
