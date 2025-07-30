@@ -31,14 +31,19 @@ fun PantallaControlApps(
         }
     }
 
-    Column(modifier = Modifier
-        .fillMaxSize()
-        .padding(16.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
         Text("Control de Aplicaciones", style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(12.dp))
 
         if (usosApps.isEmpty()) {
-            Text("No se encontraron aplicaciones usadas aún.", color = MaterialTheme.colorScheme.onBackground)
+            Text(
+                "No se encontraron aplicaciones usadas aún.",
+                color = MaterialTheme.colorScheme.onBackground
+            )
         }
 
         LazyColumn {
@@ -52,7 +57,13 @@ fun PantallaControlApps(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(app.nombreApp, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            text = if (app.nombreApp == app.nombrePaquete)
+                                app.nombrePaquete
+                            else
+                                "${app.nombreApp} (${app.nombrePaquete})",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
                         // Ya no mostramos el nombre del paquete para mantener la vista limpia
                         // Text("Paquete: ${app.nombrePaquete}", style = MaterialTheme.typography.bodySmall)
                     }
@@ -60,7 +71,11 @@ fun PantallaControlApps(
                     Switch(
                         checked = bloqueada,
                         onCheckedChange = { nuevoEstado ->
-                            vistaModeloApps.cambiarEstadoBloqueo(uidHijo, app.nombrePaquete, nuevoEstado)
+                            vistaModeloApps.cambiarEstadoBloqueo(
+                                uidHijo,
+                                app.nombrePaquete,
+                                nuevoEstado
+                            )
                         }
                     )
                 }

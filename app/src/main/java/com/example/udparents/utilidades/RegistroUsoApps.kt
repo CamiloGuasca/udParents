@@ -78,7 +78,7 @@ object RegistroUsoApps {
                 }
 
                 val nombreAppRaw = obtenerNombreApp(context, packageName)
-                val nombreApp = if (nombreAppRaw == packageName) "Aplicación desconocida" else nombreAppRaw
+                val nombreApp = if (nombreAppRaw == packageName) packageName else nombreAppRaw
                 Log.d(TAG, "✅ Lista para registrar: $nombreApp ($packageName), Tiempo: ${tiempoUso} ms")
 
                 val appUso = AppUso(
