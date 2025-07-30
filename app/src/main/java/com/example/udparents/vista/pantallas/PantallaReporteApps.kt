@@ -29,6 +29,8 @@ fun formatoTiempo(ms: Long): String {
     }
 }
 
+// ... (imports previos)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaReporteApps(
@@ -114,9 +116,7 @@ fun PantallaReporteApps(
                 onValueChange = {},
                 label = { Text("Hijo") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                modifier = Modifier
-                    .menuAnchor()
-                    .fillMaxWidth()
+                modifier = Modifier.menuAnchor().fillMaxWidth()
             )
 
             ExposedDropdownMenu(
@@ -159,11 +159,14 @@ fun PantallaReporteApps(
 
         Spacer(Modifier.height(8.dp))
 
-        Button(onClick = {
-            hijoSeleccionado?.let { (id, _) ->
-                vistaModelo.cargarUsos(id, fechaDesde.value, fechaHasta.value)
-            }
-        }, enabled = hijoSeleccionado != null) {
+        Button(
+            onClick = {
+                hijoSeleccionado?.let { (id, _) ->
+                    vistaModelo.cargarUsos(id, fechaDesde.value, fechaHasta.value)
+                }
+            },
+            enabled = hijoSeleccionado != null
+        ) {
             Text("Consultar")
         }
 
@@ -188,17 +191,17 @@ fun PantallaReporteApps(
                     modifier = Modifier.fillMaxHeight(0.6f)
                 ) {
                     items(usos) { app ->
-                        val nombreMostrado = if (app.nombreApp == app.nombrePaquete)
-                            app.nombrePaquete
-                        else
-                            "${app.nombreApp} (${app.nombrePaquete})"
-
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                         ) {
                             Column(Modifier.padding(12.dp)) {
-                                Text(nombreMostrado, style = MaterialTheme.typography.titleMedium)
+                                if (app.nombreApp == app.nombrePaquete) {
+                                    Text(app.nombrePaquete, style = MaterialTheme.typography.titleMedium)
+                                } else {
+                                    Text(app.nombreApp, style = MaterialTheme.typography.titleMedium)
+                                    Text("(${app.nombrePaquete})", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                                 Text("🕒 Fecha: ${dateFormat.format(Date(app.fechaUso))}")
                                 Text("⏱ Tiempo de uso: ${formatoTiempo(app.tiempoUso)}")
                             }
