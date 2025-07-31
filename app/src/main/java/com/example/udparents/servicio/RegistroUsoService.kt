@@ -10,28 +10,28 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.udparents.R
 import com.example.udparents.repositorio.RepositorioApps
-import com.example.udparents.utilidades.RegistroUsoApps // Asegúrate de que esta importación sea correcta
+import com.example.udparents.utilidades.RegistroUsoApps
 import com.example.udparents.vista.pantallas.PantallaBloqueoComposeActivity
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.*
 import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
+import java.util.Calendar
 
 class RegistroUsoService : Service() {
 
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private var tareaMonitoreo: Job? = null
-    private var tareaRegistroUso: Job? = null // Nueva tarea para el registro de uso en Firebase
-    private val intervaloChequeoAppEnUso = 3000L // 3 segundos para el chequeo de bloqueo
-    private val intervaloRegistroUso = 3 * 1000L // 30 segundos para registrar el uso en Firebase (antes 5 minutos)
-    private var paqueteBloqueadoActual: String? = null // Para evitar relanzar la pantalla de bloqueo repetidamente
+    private var tareaRegistroUso: Job? = null
+    private val intervaloChequeoAppEnUso = 3000L // 3 segundos para el chequeo de bloqueo y el incremento "en vivo"
+    private val intervaloRegistroUso = 30 * 1000L // <-- Asegúrate que sea 30 segundos aquí
+    private var paqueteBloqueadoActual: String? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d("RegistroUsoService", "✅ Servicio iniciado correctamente")
         Log.d("RegistroUsoService", "🧬 Servicio sigue corriendo tras cierre")
         mostrarNotificacion()
 
-        // Monitoreo de apps en uso para bloqueo (alta frecuencia)
         tareaMonitoreo = scope.launch {
             while (isActive) {
                 try {
@@ -43,11 +43,10 @@ class RegistroUsoService : Service() {
             }
         }
 
-        // Registro periódico del uso de apps en Firebase (frecuencia media)
         tareaRegistroUso = scope.launch {
             while (isActive) {
                 try {
-                    Log.d("RegistroUsoService", "📝 Iniciando registro periódico de uso de apps en Firebase...")
+                    Log.d("RegistroUsoService", "📝 Iniciando registro periódico de uso de apps en Firebase (barrido general)...")
                     RegistroUsoApps.registrarUsoAplicaciones(applicationContext)
                     Log.d("RegistroUsoService", "✅ Registro periódico de uso de apps finalizado.")
                 } catch (e: Exception) {
@@ -65,12 +64,12 @@ class RegistroUsoService : Service() {
         val usageStatsManager =
             context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val ahora = System.currentTimeMillis()
-        val hace10Segundos = ahora - 10_000 // Consulta un rango corto para obtener la app más reciente
+        val hace10Segundos = ahora - 10_000
 
         val stats: List<UsageStats> = usageStatsManager.queryUsageStats(
-            UsageStatsManager.INTERVAL_DAILY, // Consulta el uso desde el inicio del día
-            hace10Segundos, // Desde hace 10 segundos
-            ahora // Hasta ahora
+            UsageStatsManager.INTERVAL_DAILY,
+            hace10Segundos,
+            ahora
         )
 
         if (stats.isNullOrEmpty()) {
@@ -78,7 +77,6 @@ class RegistroUsoService : Service() {
             return
         }
 
-        // Obtiene la aplicación que ha estado más recientemente en primer plano
         val appEnUso = stats.maxByOrNull { it.lastTimeUsed } ?: run {
             Log.d("RegistroUsoService", "No se pudo determinar la aplicación en uso más reciente.")
             return
@@ -90,54 +88,44 @@ class RegistroUsoService : Service() {
         }
         val repositorio = RepositorioApps()
 
-        // 1. Verificar bloqueo manual (si el padre la bloqueó directamente)
-        val bloqueadaManual = repositorio.estaAppBloqueada(uidHijo, paqueteActual)
+        val nombreAppActual = obtenerNombreApp(context, paqueteActual)
 
-        // 2. Verificar bloqueo por límite de tiempo
-        // Necesitamos el límite establecido y el uso acumulado de la app para el día
-        val tiempoLimite = repositorio.obtenerLimiteApp(uidHijo, paqueteActual)
+        // LÓGICA CLAVE: Incrementar el uso de la aplicación activa cada 3 segundos
+        repositorio.incrementarUsoAplicacion(uidHijo, paqueteActual, nombreAppActual, intervaloChequeoAppEnUso)
+
+        // Ahora, obtenemos el tiempo de uso *después* de haberlo incrementado
         val tiempoUsoActual = repositorio.obtenerUsoAppDelDia(uidHijo, paqueteActual)
 
-        // La app está bloqueada por límite si hay un límite establecido (> 0)
-        // Y el tiempo de uso actual es igual o ha excedido ese límite
+        val bloqueadaManual = repositorio.estaAppBloqueada(uidHijo, paqueteActual)
+        val tiempoLimite = repositorio.obtenerLimiteApp(uidHijo, paqueteActual)
         val bloqueadaPorLimite = tiempoLimite > 0L && tiempoUsoActual >= tiempoLimite
 
-        // Determinar si la aplicación debe ser bloqueada por cualquier razón
         val debeBloquear = bloqueadaManual || bloqueadaPorLimite
 
         if (debeBloquear) {
-            // Solo lanza la pantalla de bloqueo si la app es diferente a la que ya está bloqueada
-            // Esto evita el bucle de relanzamiento de la misma pantalla.
             if (paqueteActual != paqueteBloqueadoActual) {
                 paqueteBloqueadoActual = paqueteActual
-                val nombreApp = obtenerNombreApp(context, paqueteActual)
                 val motivoBloqueo = when {
                     bloqueadaManual -> "Bloqueo manual"
                     bloqueadaPorLimite -> "Límite de tiempo excedido"
-                    else -> "Desconocido" // En caso de que ninguna condición anterior se cumpla (poco probable)
+                    else -> "Desconocido"
                 }
-                Log.d("RegistroUsoService", "🔒 App bloqueada detectada: $nombreApp ($paqueteActual) - Motivo: $motivoBloqueo")
+                Log.d("RegistroUsoService", "🔒 App bloqueada detectada: $nombreAppActual ($paqueteActual) - Motivo: $motivoBloqueo")
 
                 val intent = Intent(context, PantallaBloqueoComposeActivity::class.java).apply {
-                    // FLAG_ACTIVITY_NEW_TASK es crucial para lanzar una actividad desde un contexto que no es una actividad
-                    // FLAG_ACTIVITY_CLEAR_TOP asegura que si la actividad ya está en la pila, se suba a la cima y se eliminen las de arriba.
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    putExtra("nombreApp", nombreApp)
+                    putExtra("nombreApp", nombreAppActual)
                     putExtra("paqueteBloqueado", paqueteActual)
                 }
                 context.startActivity(intent)
             }
         } else {
-            // Si la app actual no está bloqueada y teníamos una app bloqueada previamente,
-            // significa que el bloqueo se levantó o la app cambió.
             if (paqueteBloqueadoActual != null) {
                 Log.d("RegistroUsoService", "✅ App desbloqueada o cambio de app: $paqueteActual")
             }
             paqueteBloqueadoActual = null
         }
     }
-
-    // --- Las siguientes funciones se mantienen EXACTAMENTE como las tenías ---
 
     private fun obtenerNombreApp(context: Context, packageName: String): String {
         return try {
@@ -154,7 +142,7 @@ class RegistroUsoService : Service() {
         Log.w("RegistroUsoService", "🛑 Servicio detenido inesperadamente")
         scope.cancel()
         tareaMonitoreo?.cancel()
-        tareaRegistroUso?.cancel() // ¡Importante: cancelar la nueva tarea también!
+        tareaRegistroUso?.cancel()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -188,7 +176,6 @@ class RegistroUsoService : Service() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        // Reinicia el servicio si la tarea es eliminada para asegurar el monitoreo continuo.
         val restartService = Intent(applicationContext, RegistroUsoService::class.java)
         restartService.setPackage(packageName)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

@@ -58,6 +58,7 @@ dependencies {
 
     // Dependencias de Lifecycle (Compose)
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.2")
+    implementation("androidx.compose.material:material-icons-extended:1.6.1")
 
     // Firebase BOM: Gestiona las versiones de todas las librerías de Firebase
     // ¡Esta línea es CRÍTICA y debe estar presente UNA SOLA VEZ!

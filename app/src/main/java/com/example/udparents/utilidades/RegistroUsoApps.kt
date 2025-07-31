@@ -18,7 +18,6 @@ object RegistroUsoApps {
 
     private const val TAG = "RegistroUsoAppsDEBUG"
 
-
     suspend fun registrarUsoAplicaciones(context: Context) {
         val uidHijo = FirebaseAuth.getInstance().currentUser?.uid ?: run {
             Log.w(TAG, "UID del hijo no disponible, no se puede registrar el uso.")
@@ -38,9 +37,8 @@ object RegistroUsoApps {
         }
         val todayStartMillis = calendar.timeInMillis
 
-        // Se mantiene igual, consulta el uso desde el inicio del día hasta ahora.
         val stats: List<UsageStats> = usageStatsManager.queryUsageStats(
-            UsageStatsManager.INTERVAL_DAILY, // <-- Esto es clave para obtener el acumulado del día
+            UsageStatsManager.INTERVAL_DAILY,
             todayStartMillis,
             ahora
         )
@@ -57,12 +55,26 @@ object RegistroUsoApps {
 
         val repositorio = RepositorioApps()
 
+        // Obtener la aplicación que está actualmente en primer plano
+        // Esto es crucial para evitar sobrescribir su uso con un valor potencialmente desactualizado
+        val topApp = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, ahora - 10000, ahora)
+            .maxByOrNull { it.lastTimeUsed }
+        val paqueteEnPrimerPlano = topApp?.packageName
+
         withContext(Dispatchers.IO) {
             var appsProcesadas = 0
             var appsRegistradas = 0
             for (app in stats) {
-                val tiempoUso = app.totalTimeInForeground // <-- Esto ya es el tiempo acumulado
+                val tiempoUso = app.totalTimeInForeground
                 val packageName = app.packageName
+
+                // *** CAMBIO CLAVE AQUÍ ***
+                // Si la aplicación está actualmente en primer plano, la ignoramos en este barrido.
+                // Su tiempo de uso se está incrementando en tiempo real por el otro mecanismo.
+                if (packageName == paqueteEnPrimerPlano) {
+                    Log.d(TAG, "➡️ Ignorando app en primer plano ($packageName) en el barrido general. Su uso se incrementa en tiempo real.")
+                    continue
+                }
 
                 if (packageName == context.packageName) {
                     Log.d(TAG, "➡️ Ignorando la propia aplicación: $packageName")
@@ -79,10 +91,6 @@ object RegistroUsoApps {
                     continue
                 }
 
-                // Ya no necesitas obtener el uso registrado para comparar y evitar la escritura
-                // la función `registrarUsoAplicacion` ahora usa SetOptions.merge()
-                // lo cual es más robusto y evita la lógica de delta.
-                // Firebase lo actualizará si el tiempoUso ha cambiado.
                 val nombreAppRaw = obtenerNombreApp(context, packageName)
                 val nombreApp = if (nombreAppRaw == packageName) packageName else nombreAppRaw
                 Log.d(TAG, "✅ Lista para registrar: $nombreApp ($packageName), Tiempo: ${tiempoUso} ms")
@@ -91,10 +99,10 @@ object RegistroUsoApps {
                     nombrePaquete = packageName,
                     nombreApp = nombreApp,
                     fechaUso = todayStartMillis,
-                    tiempoUso = tiempoUso
+                    tiempoUso = tiempoUso // Este es el tiempo consolidado del UsageStatsManager
                 )
                 try {
-                    // Esta llamada ahora simplemente actualiza el documento con el nuevo tiempoUso acumulado.
+                    // Esta llamada ahora solo actualiza apps que NO están en primer plano
                     repositorio.registrarUsoAplicacion(uidHijo, appUso)
                     appsRegistradas++
                 } catch (e: Exception) {
