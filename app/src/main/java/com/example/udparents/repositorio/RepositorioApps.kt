@@ -1,74 +1,62 @@
 // com.example.udparents.repositorio/RepositorioApps.kt
 
 package com.example.udparents.repositorio
-
+import com.google.firebase.firestore.SetOptions
 import com.example.udparents.modelo.AppUso
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import android.util.Log // Importar para logs
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
+import java.util.Calendar
 import java.util.Date // Mantener esta importación si la usas para logs o en otros lugares
 
 class RepositorioApps {
 
     private val db = FirebaseFirestore.getInstance()
     private val TAG = "RepositorioApps" // Para logs más específicos
+    private val ultimoUsoRegistrado = mutableMapOf<String, Long>()
 
     // *** MODIFICACIÓN PRINCIPAL AQUÍ ***
-    suspend fun registrarUsoAplicacion(idHijo: String, appUso: AppUso) {
-        // Creamos un ID de documento único basado en el paquete de la app y la fecha de uso (medianoche).
-        // Esto asegura que solo haya un documento por app por día.
-        val documentId = "${appUso.nombrePaquete}_${appUso.fechaUso}" // fechaUso ahora debe ser el inicio del día
 
-        val docRef = db.collection("usos_apps")
-            .document(idHijo)
-            .collection("historial")
-            .document(documentId)
+
+    suspend fun registrarUsoAplicacion(uidHijo: String, appUso: AppUso) {
+        val clave = "${appUso.nombrePaquete}_${formatearFecha(appUso.fechaUso)}"
+        val docRef = db.collection("hijos").document(uidHijo)
+            .collection("uso_apps").document(clave)
 
         try {
-            db.runTransaction { transaction ->
-                val snapshot = transaction.get(docRef)
-
-                if (snapshot.exists()) {
-                    // Si el documento ya existe, sumamos el tiempo de uso.
-                    val existingTime = snapshot.getLong("tiempoUso") ?: 0L
-                    val newTotalTime = existingTime + appUso.tiempoUso
-                    transaction.update(docRef, "tiempoUso", newTotalTime)
-                    Log.d(TAG, "✅ Actualizado uso de ${appUso.nombreApp} (${appUso.nombrePaquete}) para el día ${Date(appUso.fechaUso)}. Tiempo total: ${newTotalTime} ms")
-                } else {
-                    // Si el documento no existe, lo creamos.
-                    // Asegúrate de que los datos sean compatibles con tu modelo AppUso.
-                    transaction.set(docRef, appUso)
-                    Log.d(TAG, "➕ Nuevo registro de uso para ${appUso.nombreApp} (${appUso.nombrePaquete}) el día ${Date(appUso.fechaUso)}. Tiempo: ${appUso.tiempoUso} ms")
-                }
-                null // Una transacción exitosa debe devolver null o un valor.
-            }.await()
+            // Simplemente guardamos el AppUso. Firebase sobrescribirá si el documento existe,
+            // o lo creará si no. El tiempoUso ya viene acumulado del UsageStatsManager.
+            docRef.set(appUso, SetOptions.merge()) // Usa merge para solo actualizar los campos proporcionados
+            Log.d(TAG, "✅ Uso de app registrado/actualizado: ${appUso.nombreApp} (${appUso.tiempoUso} ms) para ${uidHijo}")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error al registrar/actualizar uso de aplicación: ${appUso.nombreApp} - ${e.message}", e)
-            throw e // Propaga la excepción para manejo superior si es necesario
+            Log.e(TAG, "❌ Error al registrar uso de app ${appUso.nombrePaquete}: ${e.message}", e)
         }
     }
+
 
     // El resto de tus funciones en RepositorioApps se mantienen IGUAL.
     // Ej: obtenerUsosPorFecha, obtenerHijosVinculados, bloquearApp, estaAppBloqueada.
     // La función obtenerUsosPorFecha ahora traerá los datos ya agrupados por día.
 
     suspend fun obtenerUsosPorFecha(idHijo: String, desde: Long, hasta: Long): List<AppUso> {
-        println("📅 Consulta para $idHijo desde ${Date(desde)} hasta ${Date(hasta)}")
-        val snapshot = db.collection("usos_apps")
+        val desdeDia = formatearFecha(desde)
+        val hastaDia = formatearFecha(hasta)
+
+        val snapshot = db.collection("hijos")
             .document(idHijo)
-            .collection("historial")
-            .whereGreaterThanOrEqualTo("fechaUso", desde)
-            .whereLessThanOrEqualTo("fechaUso", hasta)
+            .collection("uso_apps")
             .get()
             .await()
 
-        println("📄 Documentos encontrados: ${snapshot.documents.size}")
-        snapshot.documents.forEachIndexed { i, doc ->
-            println("🔍 Doc[$i] => ${doc.data}")
-        }
-
         return snapshot.documents.mapNotNull { it.toObject(AppUso::class.java) }
+            .filter { appUso ->
+                val fecha = formatearFecha(appUso.fechaUso)
+                fecha >= desdeDia && fecha <= hastaDia
+            }
     }
+
     suspend fun obtenerHijosVinculados(idPadre: String): List<Pair<String, String>> {
         val snapshot = FirebaseFirestore.getInstance()
             .collection("codigos_vinculacion")
@@ -113,4 +101,86 @@ class RepositorioApps {
             false // Si falla la consulta, asumimos que no está bloqueada
         }
     }
+    suspend fun establecerLimiteApp(uidHijo: String, packageName: String, tiempoLimite: Long) {
+        try {
+            // Asegúrate de que la colección sea la misma que se consulta.
+            // La colección "limites_apps" debe ser a nivel de hijo, y dentro
+            // una subcolección "apps" con el documento del paquete.
+            val ref = db.collection("hijos").document(uidHijo) // <-- Agregado "hijos" y uidHijo
+                .collection("limites_apps") // <-- Nombre de colección consistente
+                .document(packageName)
+
+            ref.set(mapOf("tiempoLimite" to tiempoLimite)).await() // <-- Campo consistente
+            Log.d(TAG, "✅ Límite establecido para $packageName: ${tiempoLimite} ms")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error al guardar límite para $packageName: ${e.message}", e)
+        }
+    }
+    suspend fun obtenerLimitesApps(uidHijo: String): Map<String, Long> {
+        return try {
+            val snapshot = db.collection("hijos").document(uidHijo) // <-- Agregado "hijos" y uidHijo
+                .collection("limites_apps") // <-- Nombre de colección consistente
+                .get()
+                .await()
+
+            snapshot.documents.associate {
+                val paquete = it.id
+                val limite = it.getLong("tiempoLimite") ?: 0L
+                paquete to limite
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error al obtener límites: ${e.message}", e)
+            emptyMap()
+        }
+    }
+    suspend fun obtenerUsoAppDelDia(uidHijo: String, paquete: String): Long {
+        val calendar = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val fecha = formatearFecha(calendar.timeInMillis)
+        val docId = "${paquete}_$fecha"
+
+        val doc = db.collection("hijos").document(uidHijo)
+            .collection("uso_apps")
+            .document(docId)
+            .get()
+            .await()
+
+        return doc.getLong("tiempoUso") ?: 0L
+    }
+
+    suspend fun obtenerLimiteApp(uidHijo: String, paquete: String): Long {
+        return try {
+            val doc = Firebase.firestore
+                .collection("hijos") // <-- Agregado "hijos"
+                .document(uidHijo)
+                .collection("limites_apps") // <-- Nombre de colección consistente
+                .document(paquete)
+                .get()
+                .await()
+
+            doc.getLong("tiempoLimite") ?: 0L // <-- Campo consistente
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error al obtener límite para $paquete: ${e.message}", e)
+            0L
+        }
+    }
+    fun formatearFecha(timestamp: Long): String {
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = timestamp
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val year = calendar.get(Calendar.YEAR)
+        val month = calendar.get(Calendar.MONTH) + 1
+        val day = calendar.get(Calendar.DAY_OF_MONTH)
+        return "%04d-%02d-%02d".format(year, month, day)
+    }
+
+
 }

@@ -18,6 +18,7 @@ object RegistroUsoApps {
 
     private const val TAG = "RegistroUsoAppsDEBUG"
 
+
     suspend fun registrarUsoAplicaciones(context: Context) {
         val uidHijo = FirebaseAuth.getInstance().currentUser?.uid ?: run {
             Log.w(TAG, "UID del hijo no disponible, no se puede registrar el uso.")
@@ -37,8 +38,9 @@ object RegistroUsoApps {
         }
         val todayStartMillis = calendar.timeInMillis
 
+        // Se mantiene igual, consulta el uso desde el inicio del día hasta ahora.
         val stats: List<UsageStats> = usageStatsManager.queryUsageStats(
-            UsageStatsManager.INTERVAL_DAILY,
+            UsageStatsManager.INTERVAL_DAILY, // <-- Esto es clave para obtener el acumulado del día
             todayStartMillis,
             ahora
         )
@@ -59,7 +61,7 @@ object RegistroUsoApps {
             var appsProcesadas = 0
             var appsRegistradas = 0
             for (app in stats) {
-                val tiempoUso = app.totalTimeInForeground
+                val tiempoUso = app.totalTimeInForeground // <-- Esto ya es el tiempo acumulado
                 val packageName = app.packageName
 
                 if (packageName == context.packageName) {
@@ -77,6 +79,10 @@ object RegistroUsoApps {
                     continue
                 }
 
+                // Ya no necesitas obtener el uso registrado para comparar y evitar la escritura
+                // la función `registrarUsoAplicacion` ahora usa SetOptions.merge()
+                // lo cual es más robusto y evita la lógica de delta.
+                // Firebase lo actualizará si el tiempoUso ha cambiado.
                 val nombreAppRaw = obtenerNombreApp(context, packageName)
                 val nombreApp = if (nombreAppRaw == packageName) packageName else nombreAppRaw
                 Log.d(TAG, "✅ Lista para registrar: $nombreApp ($packageName), Tiempo: ${tiempoUso} ms")
@@ -88,6 +94,7 @@ object RegistroUsoApps {
                     tiempoUso = tiempoUso
                 )
                 try {
+                    // Esta llamada ahora simplemente actualiza el documento con el nuevo tiempoUso acumulado.
                     repositorio.registrarUsoAplicacion(uidHijo, appUso)
                     appsRegistradas++
                 } catch (e: Exception) {

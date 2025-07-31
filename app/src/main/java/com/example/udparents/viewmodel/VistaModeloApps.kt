@@ -1,5 +1,6 @@
 package com.example.udparents.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.udparents.modelo.AppUso
@@ -19,16 +20,18 @@ class VistaModeloApps : ViewModel() {
     val hijosVinculados: StateFlow<List<Pair<String, String>>> = _hijosVinculados
     private val _estadoBloqueoApp = MutableStateFlow<Map<String, Boolean>>(emptyMap())
     val estadoBloqueoApp: StateFlow<Map<String, Boolean>> = _estadoBloqueoApp
+    private val _limitesApp = MutableStateFlow<Map<String, Long>>(emptyMap())
+    val limitesApp: StateFlow<Map<String, Long>> = _limitesApp
 
-    fun cargarUsos(idHijo: String, desde: Long, hasta: Long) {
+    fun cargarUsos(uidHijo: String, desde: Long, hasta: Long) {
         viewModelScope.launch {
-            println("🟢 Iniciando carga de usos para ID: $idHijo desde ${Date(desde)} hasta ${Date(hasta)}")
-            val usos = repositorio.obtenerUsosPorFecha(idHijo, desde, hasta)
-            println("📦 Se obtuvieron ${usos.size} registros de uso de aplicaciones.")
-            usos.forEach {
-                println("➡️ ${it.nombreApp} - ${Date(it.fechaUso)} - ${it.tiempoUso} ms")
+            try {
+                val usos = repositorio.obtenerUsosPorFecha(uidHijo, desde, hasta)
+                _listaUsos.value = usos
+                Log.d("VistaModeloApps", "Usos cargados: ${usos.size} apps.")
+            } catch (e: Exception) {
+                Log.e("VistaModeloApps", "Error al cargar usos: ${e.message}", e)
             }
-            _listaUsos.value = usos
         }
     }
     fun cargarHijos(idPadre: String) {
@@ -41,10 +44,15 @@ class VistaModeloApps : ViewModel() {
     // Cambia el estado de bloqueo (true para bloquear, false para desbloquear)
     fun cambiarEstadoBloqueo(uidHijo: String, paquete: String, bloquear: Boolean) {
         viewModelScope.launch {
-            repositorio.bloquearApp(uidHijo, paquete, bloquear)
-            // Actualizar el estado local (opcional, para reflejar en UI)
-            _estadoBloqueoApp.value = _estadoBloqueoApp.value.toMutableMap().apply {
-                put(paquete, bloquear)
+            try {
+                repositorio.bloquearApp(uidHijo, paquete, bloquear)
+                // Actualiza el estado localmente para reflejar el cambio
+                _estadoBloqueoApp.value = _estadoBloqueoApp.value.toMutableMap().apply {
+                    put(paquete, bloquear)
+                }
+                Log.d("VistaModeloApps", "App $paquete ${if (bloquear) "bloqueada" else "desbloqueada"}.")
+            } catch (e: Exception) {
+                Log.e("VistaModeloApps", "Error al cambiar estado de bloqueo para $paquete: ${e.message}", e)
             }
         }
     }
@@ -52,9 +60,40 @@ class VistaModeloApps : ViewModel() {
     // Verifica si una app está bloqueada y actualiza el estado local
     fun verificarSiEstaBloqueada(uidHijo: String, paquete: String) {
         viewModelScope.launch {
-            val estaBloqueada = repositorio.estaAppBloqueada(uidHijo, paquete)
-            _estadoBloqueoApp.value = _estadoBloqueoApp.value.toMutableMap().apply {
-                put(paquete, estaBloqueada)
+            try {
+                val bloqueada = repositorio.estaAppBloqueada(uidHijo, paquete)
+                _estadoBloqueoApp.value = _estadoBloqueoApp.value.toMutableMap().apply {
+                    put(paquete, bloqueada)
+                }
+            } catch (e: Exception) {
+                Log.e("VistaModeloApps", "Error al verificar bloqueo para $paquete: ${e.message}", e)
+            }
+        }
+    }
+    fun cargarLimites(uidHijo: String) {
+        viewModelScope.launch {
+            try {
+                // Esta llamada ahora usará la ruta y el campo correctos.
+                val limites = repositorio.obtenerLimitesApps(uidHijo)
+                _limitesApp.value = limites
+                Log.d("VistaModeloApps", "Límites cargados: ${limites.size} apps.")
+            } catch (e: Exception) {
+                Log.e("VistaModeloApps", "Error al cargar límites: ${e.message}", e)
+            }
+        }
+    }
+    fun establecerLimite(uidHijo: String, paquete: String, tiempoLimite: Long) {
+        viewModelScope.launch {
+            try {
+                // Esta llamada ahora usará la ruta y el campo correctos.
+                repositorio.establecerLimiteApp(uidHijo, paquete, tiempoLimite)
+                // Actualiza el estado localmente
+                _limitesApp.value = _limitesApp.value.toMutableMap().apply {
+                    put(paquete, tiempoLimite)
+                }
+                Log.d("VistaModeloApps", "Límite establecido para $paquete: $tiempoLimite ms.")
+            } catch (e: Exception) {
+                Log.e("VistaModeloApps", "Error al establecer límite para $paquete: ${e.message}", e)
             }
         }
     }
