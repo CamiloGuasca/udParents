@@ -61,7 +61,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.udparents.modelo.RestriccionHorario
 import com.example.udparents.viewmodel.VistaModeloApps
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -78,7 +77,8 @@ private fun formatMillisOfDay(millis: Long): String {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun PantallaProgramarRestricciones(
-    uidHijo: String,
+    listaHijos: List<Pair<String, String>>, // Recibir la lista de hijos
+    uidHijoInicial: String, // El UID del hijo que se va a mostrar al inicio
     vistaModelo: VistaModeloApps = viewModel(),
     onVolver: () -> Unit
 ) {
@@ -86,16 +86,28 @@ fun PantallaProgramarRestricciones(
     val usosApps by vistaModelo.listaUsos.collectAsState()
     val context = LocalContext.current
 
-    LaunchedEffect(uidHijo) {
-        vistaModelo.cargarRestriccionesHorario(uidHijo)
-        val ahora = System.currentTimeMillis()
-        val inicioHoy = ahora - (ahora % (24 * 60 * 60 * 1000))
-        vistaModelo.cargarUsos(uidHijo, inicioHoy, ahora)
+    // Estado para el hijo seleccionado
+    var hijoSeleccionado by remember {
+        mutableStateOf(listaHijos.find { it.first == uidHijoInicial })
+    }
+    var expandedHijoDropdown by remember { mutableStateOf(false) }
+
+    // Cargar restricciones y apps del hijo seleccionado cuando cambie
+    LaunchedEffect(hijoSeleccionado) {
+        hijoSeleccionado?.let { (uid, _) ->
+            vistaModelo.cargarRestriccionesHorario(uid)
+            val ahora = System.currentTimeMillis()
+            val inicioHoy = ahora - (ahora % (24 * 60 * 60 * 1000))
+            vistaModelo.cargarUsos(uid, inicioHoy, ahora)
+        }
     }
 
+    // Estado para el diálogo de añadir/editar restricción
     var showAddEditDialog by remember { mutableStateOf(false) }
     var editingRestriction by remember { mutableStateOf<RestriccionHorario?>(null) }
 
+
+    // --- PALETA DE COLORES (Coherente con las otras pantallas) ---
     val primaryDark = Color(0xFF1A237E)
     val primaryLight = Color(0xFF3F51B5)
     val accentColor = Color(0xFFCDDC39)
@@ -107,7 +119,43 @@ fun PantallaProgramarRestricciones(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Restricciones por Horario", color = onPrimaryColor) },
+                title = {
+                    ExposedDropdownMenuBox(
+                        expanded = expandedHijoDropdown,
+                        onExpandedChange = { expandedHijoDropdown = !expandedHijoDropdown }
+                    ) {
+                        OutlinedTextField(
+                            readOnly = true,
+                            value = "Restricciones para ${hijoSeleccionado?.second ?: "Selecciona un hijo"}",
+                            onValueChange = {},
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedHijoDropdown) },
+                            modifier = Modifier.menuAnchor(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = onPrimaryColor,
+                                unfocusedTextColor = onPrimaryColor,
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedLabelColor = onPrimaryColor,
+                                focusedLabelColor = onPrimaryColor
+                            )
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expandedHijoDropdown,
+                            onDismissRequest = { expandedHijoDropdown = false },
+                            modifier = Modifier.background(surfaceColor)
+                        ) {
+                            listaHijos.forEach { (uid, name) ->
+                                DropdownMenuItem(
+                                    text = { Text(name, color = onPrimaryColor) },
+                                    onClick = {
+                                        hijoSeleccionado = uid to name
+                                        expandedHijoDropdown = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onVolver) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = onPrimaryColor)
@@ -120,15 +168,17 @@ fun PantallaProgramarRestricciones(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    editingRestriction = null
-                    showAddEditDialog = true
-                },
-                containerColor = accentColor,
-                contentColor = primaryDark
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Añadir Restricción")
+            if (hijoSeleccionado != null) {
+                FloatingActionButton(
+                    onClick = {
+                        editingRestriction = null
+                        showAddEditDialog = true
+                    },
+                    containerColor = accentColor,
+                    contentColor = primaryDark
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Añadir Restricción")
+                }
             }
         },
         containerColor = primaryDark
@@ -139,9 +189,16 @@ fun PantallaProgramarRestricciones(
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
-            if (restricciones.isEmpty()) {
+            val uidHijo = hijoSeleccionado?.first
+            if (uidHijo == null) {
                 Text(
-                    "No hay restricciones de horario configuradas. Pulsa '+' para añadir una.",
+                    "Por favor, selecciona un hijo para ver y configurar las restricciones.",
+                    color = onSurfaceColor,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            } else if (restricciones.isEmpty()) {
+                Text(
+                    "No hay restricciones de horario configuradas para ${hijoSeleccionado?.second}. Pulsa '+' para añadir una.",
                     color = onSurfaceColor,
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -154,9 +211,15 @@ fun PantallaProgramarRestricciones(
                                 editingRestriction = it
                                 showAddEditDialog = true
                             },
-                            onDelete = { vistaModelo.eliminarRestriccionHorario(uidHijo, it.id) },
+                            onDelete = {
+                                uidHijo.let { id ->
+                                    vistaModelo.eliminarRestriccionHorario(id, it.id)
+                                }
+                            },
                             onToggleEnabled = {
-                                vistaModelo.guardarRestriccionHorario(uidHijo, it.copy(isEnabled = !it.isEnabled))
+                                uidHijo.let { id ->
+                                    vistaModelo.guardarRestriccionHorario(id, it.copy(isEnabled = !it.isEnabled))
+                                }
                             },
                             primaryDark = primaryDark,
                             primaryLight = primaryLight,
@@ -172,7 +235,8 @@ fun PantallaProgramarRestricciones(
         }
     }
 
-    if (showAddEditDialog) {
+    if (showAddEditDialog && hijoSeleccionado != null) {
+        val uidHijo = hijoSeleccionado?.first ?: ""
         AddEditRestriccionDialog(
             restriccion = editingRestriction,
             onDismiss = { showAddEditDialog = false },
@@ -243,7 +307,6 @@ fun RestriccionHorarioCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = onSurfaceColor
             )
-            // Lógica corregida para mostrar la hora
             val startTimeStr = formatMillisOfDay(restriccion.startTimeMillis)
             val endTimeStr = formatMillisOfDay(restriccion.endTimeMillis)
             Text(
@@ -380,7 +443,6 @@ fun AddEditRestriccionDialog(
                 }
                 Spacer(Modifier.height(8.dp))
 
-                // Selectores de Hora
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceAround

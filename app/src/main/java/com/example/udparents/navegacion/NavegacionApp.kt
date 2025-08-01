@@ -9,8 +9,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.listSaver
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import com.example.udparents.viewmodel.VistaModeloUsuario
@@ -26,6 +24,9 @@ import com.example.udparents.vista.pantallas.PantallaRecuperarContrasena
 import com.example.udparents.vista.pantallas.PantallaReporteApps
 import com.example.udparents.vista.pantallas.PantallaSeleccionHijoParaControl
 import com.example.udparents.vista.pantallas.PantallaVinculacionHijo
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 
 /**
  * Rutas nombradas para facilitar la navegación.
@@ -41,8 +42,8 @@ object Rutas {
     const val DISPOSITIVOS_VINCULADOS = "dispositivos_vinculados"
     const val REPORTE_APPS = "reporte_apps"
     const val CONTROL_APPS = "control_apps"
-    const val PROGRAMAR_RESTRICCIONES = "programar_restricciones/{uidHijo}" // <<-- Nueva ruta con argumento
-
+    // He quitado el argumento de la ruta para usar savedStateHandle
+    const val PROGRAMAR_RESTRICCIONES = "programar_restricciones"
 }
 
 /**
@@ -130,9 +131,17 @@ fun NavegacionApp() {
                     )
                     navController.navigate(Rutas.CONTROL_APPS)
                 },
-                // <<-- Nuevo parámetro para la pantalla de restricciones
-                onIrAProgramarRestricciones = { uidHijo ->
-                    navController.navigate("programar_restricciones/$uidHijo")
+                onIrAProgramarRestricciones = { uidHijo, hijos ->
+                    // Guardamos la lista de hijos y el UID del hijo seleccionado
+                    navController.currentBackStackEntry?.savedStateHandle?.set(
+                        "hijosVinculados",
+                        hijos
+                    )
+                    navController.currentBackStackEntry?.savedStateHandle?.set(
+                        "uidHijoInicial",
+                        uidHijo
+                    )
+                    navController.navigate(Rutas.PROGRAMAR_RESTRICCIONES)
                 }
             )
         }
@@ -207,7 +216,8 @@ fun NavegacionApp() {
                 PantallaSeleccionHijoParaControl(
                     listaHijos = hijos,
                     onHijoSeleccionado = { uidHijo ->
-                        navController.navigate("control_apps/$uidHijo")
+                        navController.currentBackStackEntry?.savedStateHandle?.set("uidHijo", uidHijo)
+                        navController.navigate("control_apps_detalles")
                     },
                     onVolver = {
                         navController.popBackStack()
@@ -216,19 +226,30 @@ fun NavegacionApp() {
             }
         }
 
-// Pantalla de control de apps con UID del hijo
-        composable("control_apps/{uidHijo}") { backStackEntry ->
-            val uidHijo = backStackEntry.arguments?.getString("uidHijo") ?: ""
+        // La pantalla de control de apps ahora es un composable separado
+        composable("control_apps_detalles") {
+            val uidHijo = navController.previousBackStackEntry
+                ?.savedStateHandle
+                ?.get<String>("uidHijo") ?: ""
             PantallaControlApps(uidHijo = uidHijo)
         }
-        composable(
-            route = Rutas.PROGRAMAR_RESTRICCIONES,
-            arguments = listOf(navArgument("uidHijo") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val uidHijo = backStackEntry.arguments?.getString("uidHijo")
-            if (uidHijo != null) {
+
+        // --- AQUI ESTA LA RUTA CORREGIDA CON EL PATRÓN CONSISTENTE ---
+        composable(Rutas.PROGRAMAR_RESTRICCIONES) {
+            val hijos = navController.previousBackStackEntry
+                ?.savedStateHandle
+                ?.get<List<Pair<String, String>>>("hijosVinculados")
+                ?: emptyList()
+
+            val uidHijoInicial = navController.previousBackStackEntry
+                ?.savedStateHandle
+                ?.get<String>("uidHijoInicial")
+
+            // Verificamos que los datos necesarios existan antes de mostrar la pantalla
+            if (hijos.isNotEmpty() && uidHijoInicial != null) {
                 PantallaProgramarRestricciones(
-                    uidHijo = uidHijo,
+                    listaHijos = hijos,
+                    uidHijoInicial = uidHijoInicial,
                     onVolver = { navController.popBackStack() }
                 )
             }

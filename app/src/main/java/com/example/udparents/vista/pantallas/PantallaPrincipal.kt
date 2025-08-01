@@ -22,8 +22,8 @@ fun PantallaPrincipal(
     onIrAReporteApps: (List<Pair<String, String>>) -> Unit,
     onIrAControlApps: (List<Pair<String, String>>) -> Unit,
     onIrADispositivosVinculados: () -> Unit,
-    // <<-- Nuevo parámetro de navegación
-    onIrAProgramarRestricciones: (String) -> Unit
+    // <<-- ¡CAMBIO AQUÍ! Ahora la función de navegación recibe el uidHijo Y la lista de hijos.
+    onIrAProgramarRestricciones: (String, List<Pair<String, String>>) -> Unit
 ) {
     val vistaModelo: VistaModeloApps = viewModel()
     val hijosVinculados by vistaModelo.hijosVinculados.collectAsState()
@@ -87,13 +87,11 @@ fun PantallaPrincipal(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // <<-- Nuevo botón para ir a la pantalla de restricciones
+            // <<-- ¡CAMBIO AQUÍ! Ahora el onClick llama a la función con ambos parámetros.
             Button(
                 onClick = {
-                    // Aquí asumimos que quieres programar restricciones para el primer hijo.
-                    // Si tienes una lista de hijos, podrías mostrar un diálogo para seleccionar uno.
                     hijosVinculados.firstOrNull()?.let { (uidHijo, _) ->
-                        onIrAProgramarRestricciones(uidHijo)
+                        onIrAProgramarRestricciones(uidHijo, hijosVinculados)
                     }
                 },
                 enabled = hijosVinculados.isNotEmpty(),
