@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlin.random.Random
+import android.util.Log
 import android.provider.Settings
 import com.example.udparents.utilidades.RegistroUsoApps
 
@@ -170,6 +171,57 @@ class VistaModeloVinculacion(
             _codigoVinculacion.value = _codigoVinculacion.value.copy(dispositivoHijo = it)
         }
     }
+    // =================================================================================================
+    // NUEVAS FUNCIONES PARA LA HU-011: Gestión de perfiles
+    // =================================================================================================
 
+    /**
+     * Actualiza la información de un perfil de hijo vinculado.
+     * @param uidPadre El UID del padre.
+     * @param dispositivo El objeto [CodigoVinculacion] con los datos actualizados.
+     */
+    fun actualizarVinculacion(uidPadre: String, dispositivo: CodigoVinculacion) {
+        viewModelScope.launch {
+            try {
+                repositorio.actualizarVinculacion(uidPadre, dispositivo) { exito ->
+                    if (exito) {
+                        // Actualizar la lista localmente para reflejar los cambios en la UI.
+                        val listaActualizada = _dispositivosVinculados.value.map {
+                            if (it.dispositivoHijo == dispositivo.dispositivoHijo) dispositivo else it
+                        }
+                        _dispositivosVinculados.value = listaActualizada
+                        Log.d("VistaModeloVinculacion", "Vinculación actualizada para: ${dispositivo.nombreHijo}")
+                    } else {
+                        Log.e("VistaModeloVinculacion", "Error al actualizar la vinculación")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("VistaModeloVinculacion", "Error al actualizar vinculación: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
+     * Elimina un perfil de hijo vinculado.
+     * @param uidPadre El UID del padre.
+     * @param uidHijo El UID del hijo cuyo perfil se va a eliminar.
+     */
+    fun eliminarVinculacion(uidPadre: String, uidHijo: String) {
+        viewModelScope.launch {
+            try {
+                repositorio.eliminarVinculacion(uidPadre, uidHijo) { exito ->
+                    if (exito) {
+                        // Eliminar de la lista localmente para reflejar los cambios en la UI.
+                        _dispositivosVinculados.value = _dispositivosVinculados.value.filter { it.dispositivoHijo != uidHijo }
+                        Log.d("VistaModeloVinculacion", "Vinculación eliminada para el hijo con UID: $uidHijo")
+                    } else {
+                        Log.e("VistaModeloVinculacion", "Error al eliminar la vinculación")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("VistaModeloVinculacion", "Error al eliminar vinculación: ${e.message}", e)
+            }
+        }
+    }
 
 }

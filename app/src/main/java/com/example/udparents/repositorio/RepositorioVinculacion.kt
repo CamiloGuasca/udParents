@@ -80,4 +80,52 @@ class RepositorioVinculacion {
             .await()
         return !snapshot.isEmpty
     }
+    fun actualizarVinculacion(
+        uidPadre: String,
+        dispositivo: CodigoVinculacion,
+        onResult: (Boolean) -> Unit
+    ) {
+        // En Firestore, el documento del hijo está bajo el código de vinculación.
+        // Se actualizan solo los campos que pueden ser editados.
+        db.collection("codigos_vinculacion")
+            .document(dispositivo.codigo)
+            .update(
+                mapOf(
+                    "nombreHijo" to dispositivo.nombreHijo,
+                    "edadHijo" to dispositivo.edadHijo,
+                    "sexoHijo" to dispositivo.sexoHijo
+                )
+            )
+            .addOnSuccessListener { onResult(true) }
+            .addOnFailureListener { onResult(false) }
+    }
+
+    /**
+     * Elimina una vinculación de la base de datos de Firestore.
+     * @param uidPadre El UID del padre.
+     * @param uidHijo El UID del hijo a desvincular.
+     * @param onResult Callback que indica si la operación fue exitosa o no.
+     */
+    fun eliminarVinculacion(
+        uidPadre: String,
+        uidHijo: String,
+        onResult: (Boolean) -> Unit
+    ) {
+        // En este caso, buscaremos el documento por el uidHijo para eliminarlo.
+        db.collection("codigos_vinculacion")
+            .whereEqualTo("idPadre", uidPadre)
+            .whereEqualTo("dispositivoHijo", uidHijo)
+            .get()
+            .addOnSuccessListener { querySnapshot ->
+                if (!querySnapshot.isEmpty) {
+                    val document = querySnapshot.documents[0] // Asumimos una única vinculación por hijo
+                    document.reference.delete()
+                        .addOnSuccessListener { onResult(true) }
+                        .addOnFailureListener { onResult(false) }
+                } else {
+                    onResult(false) // No se encontró el documento para eliminar
+                }
+            }
+            .addOnFailureListener { onResult(false) }
+    }
 }
