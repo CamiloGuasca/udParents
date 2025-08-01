@@ -354,7 +354,9 @@ fun AddEditRestriccionDialog(
                         onValueChange = {},
                         label = { Text("Aplicación", color = onSurfaceColor) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedAppDropdown) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = accentColor,
                             unfocusedBorderColor = borderColor,
@@ -511,6 +513,7 @@ fun AddEditRestriccionDialog(
                 border = ButtonDefaults.outlinedButtonBorder.copy(brush = SolidColor(borderColor))
             ) {
                 Text("Cancelar")
+                println("ola")
             }
         },
         containerColor = primaryDark
