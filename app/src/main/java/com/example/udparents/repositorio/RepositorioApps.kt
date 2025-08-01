@@ -31,7 +31,7 @@ class RepositorioApps {
         }
     }
 
-    // *** NUEVA FUNCIÓN: incrementarUsoAplicacion (para el monitoreo en tiempo real) ***
+    // *** FUNCIÓN CORREGIDA: incrementarUsoAplicacion (para el monitoreo en tiempo real) ***
     suspend fun incrementarUsoAplicacion(uidHijo: String, packageName: String, appName: String, incrementBy: Long) {
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -41,34 +41,37 @@ class RepositorioApps {
         }
         val fecha = formatearFecha(calendar.timeInMillis)
         val docId = "${packageName}_$fecha"
-
         val docRef = db.collection("hijos").document(uidHijo)
             .collection("uso_apps").document(docId)
 
         try {
-            // Intenta incrementar el valor existente.
-            // Si el documento no existe, esta operación fallará (lanzará una excepción).
-            docRef.update("tiempoUso", FieldValue.increment(incrementBy)).await()
-            Log.d(TAG, "📈 Uso de $packageName incrementado en $incrementBy ms.")
-        } catch (e: Exception) {
-            // Si el documento no existe (ej. primera vez que se usa la app hoy),
-            // lo creamos con el valor inicial del incremento.
-            // La excepción puede ser FirebaseFirestoreException o simplemente un mensaje "NOT_FOUND".
-            if (e.message?.contains("NOT_FOUND") == true || e is com.google.firebase.firestore.FirebaseFirestoreException) {
+            // Intenta obtener el documento primero
+            val docSnapshot = docRef.get().await()
+
+            if (docSnapshot.exists()) {
+                // Si el documento ya existe, usa FieldValue.increment() para actualizar de forma atómica.
+                // Esto garantiza que múltiples actualizaciones concurrentes no sobrescriban el valor.
+                docRef.update("tiempoUso", FieldValue.increment(incrementBy)).await()
+                Log.d(TAG, "📈 Uso de $packageName incrementado en $incrementBy ms.")
+            } else {
+                // Si el documento no existe, lo creamos con el valor inicial.
                 val appUsoInicial = AppUso(
                     nombrePaquete = packageName,
-                    nombreApp = appName, // Usamos el nombre de la app que se pasó como parámetro
+                    nombreApp = appName,
                     fechaUso = calendar.timeInMillis,
-                    tiempoUso = incrementBy // El tiempo inicial es el incremento actual
+                    tiempoUso = incrementBy
                 )
                 // Usamos SetOptions.merge() para crear el documento o fusionarlo si ya existe con otros campos
                 docRef.set(appUsoInicial, SetOptions.merge()).await()
                 Log.d(TAG, "➕ Documento de uso para $packageName creado con $incrementBy ms.")
-            } else {
-                Log.e(TAG, "❌ Error inesperado al incrementar/crear uso de $packageName: ${e.message}", e)
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error inesperado al incrementar/crear uso de $packageName: ${e.message}", e)
         }
     }
+
+    // Las demás funciones se mantienen sin cambios
+
     suspend fun guardarRestriccionHorario(uidHijo: String, restriccion: RestriccionHorario) {
         val docRef = db.collection("hijos").document(uidHijo)
             .collection("horarios_restriccion").document(restriccion.id.ifEmpty { db.collection("hijos").document(uidHijo).collection("horarios_restriccion").document().id }) // Genera ID si está vacío
@@ -103,8 +106,6 @@ class RepositorioApps {
             Log.e(TAG, "❌ Error al eliminar restricción de horario: ${e.message}", e)
         }
     }
-
-    // *** Las demás funciones existentes se mantienen IGUAL ***
 
     suspend fun establecerLimiteApp(uidHijo: String, packageName: String, tiempoLimite: Long) {
         try {
