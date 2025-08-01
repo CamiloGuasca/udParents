@@ -77,8 +77,8 @@ private fun formatMillisOfDay(millis: Long): String {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun PantallaProgramarRestricciones(
-    listaHijos: List<Pair<String, String>>, // Recibir la lista de hijos
-    uidHijoInicial: String, // El UID del hijo que se va a mostrar al inicio
+    uidHijo: String,
+    nombreHijo: String,
     vistaModelo: VistaModeloApps = viewModel(),
     onVolver: () -> Unit
 ) {
@@ -86,20 +86,12 @@ fun PantallaProgramarRestricciones(
     val usosApps by vistaModelo.listaUsos.collectAsState()
     val context = LocalContext.current
 
-    // Estado para el hijo seleccionado
-    var hijoSeleccionado by remember {
-        mutableStateOf(listaHijos.find { it.first == uidHijoInicial })
-    }
-    var expandedHijoDropdown by remember { mutableStateOf(false) }
-
     // Cargar restricciones y apps del hijo seleccionado cuando cambie
-    LaunchedEffect(hijoSeleccionado) {
-        hijoSeleccionado?.let { (uid, _) ->
-            vistaModelo.cargarRestriccionesHorario(uid)
-            val ahora = System.currentTimeMillis()
-            val inicioHoy = ahora - (ahora % (24 * 60 * 60 * 1000))
-            vistaModelo.cargarUsos(uid, inicioHoy, ahora)
-        }
+    LaunchedEffect(uidHijo) {
+        vistaModelo.cargarRestriccionesHorario(uidHijo)
+        val ahora = System.currentTimeMillis()
+        val inicioHoy = ahora - (ahora % (24 * 60 * 60 * 1000))
+        vistaModelo.cargarUsos(uidHijo, inicioHoy, ahora)
     }
 
     // Estado para el diálogo de añadir/editar restricción
@@ -120,41 +112,11 @@ fun PantallaProgramarRestricciones(
         topBar = {
             TopAppBar(
                 title = {
-                    ExposedDropdownMenuBox(
-                        expanded = expandedHijoDropdown,
-                        onExpandedChange = { expandedHijoDropdown = !expandedHijoDropdown }
-                    ) {
-                        OutlinedTextField(
-                            readOnly = true,
-                            value = "Restricciones para ${hijoSeleccionado?.second ?: "Selecciona un hijo"}",
-                            onValueChange = {},
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedHijoDropdown) },
-                            modifier = Modifier.menuAnchor(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = onPrimaryColor,
-                                unfocusedTextColor = onPrimaryColor,
-                                unfocusedBorderColor = Color.Transparent,
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedLabelColor = onPrimaryColor,
-                                focusedLabelColor = onPrimaryColor
-                            )
-                        )
-                        ExposedDropdownMenu(
-                            expanded = expandedHijoDropdown,
-                            onDismissRequest = { expandedHijoDropdown = false },
-                            modifier = Modifier.background(surfaceColor)
-                        ) {
-                            listaHijos.forEach { (uid, name) ->
-                                DropdownMenuItem(
-                                    text = { Text(name, color = onPrimaryColor) },
-                                    onClick = {
-                                        hijoSeleccionado = uid to name
-                                        expandedHijoDropdown = false
-                                    }
-                                )
-                            }
-                        }
-                    }
+                    // Título fijo con el nombre del hijo, no un dropdown
+                    Text(
+                        "Restricciones para $nombreHijo",
+                        color = onPrimaryColor
+                    )
                 },
                 navigationIcon = {
                     IconButton(onClick = onVolver) {
@@ -168,17 +130,15 @@ fun PantallaProgramarRestricciones(
             )
         },
         floatingActionButton = {
-            if (hijoSeleccionado != null) {
-                FloatingActionButton(
-                    onClick = {
-                        editingRestriction = null
-                        showAddEditDialog = true
-                    },
-                    containerColor = accentColor,
-                    contentColor = primaryDark
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Añadir Restricción")
-                }
+            FloatingActionButton(
+                onClick = {
+                    editingRestriction = null
+                    showAddEditDialog = true
+                },
+                containerColor = accentColor,
+                contentColor = primaryDark
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Añadir Restricción")
             }
         },
         containerColor = primaryDark
@@ -189,16 +149,9 @@ fun PantallaProgramarRestricciones(
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
-            val uidHijo = hijoSeleccionado?.first
-            if (uidHijo == null) {
+            if (restricciones.isEmpty()) {
                 Text(
-                    "Por favor, selecciona un hijo para ver y configurar las restricciones.",
-                    color = onSurfaceColor,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            } else if (restricciones.isEmpty()) {
-                Text(
-                    "No hay restricciones de horario configuradas para ${hijoSeleccionado?.second}. Pulsa '+' para añadir una.",
+                    "No hay restricciones de horario configuradas para $nombreHijo. Pulsa '+' para añadir una.",
                     color = onSurfaceColor,
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -212,14 +165,10 @@ fun PantallaProgramarRestricciones(
                                 showAddEditDialog = true
                             },
                             onDelete = {
-                                uidHijo.let { id ->
-                                    vistaModelo.eliminarRestriccionHorario(id, it.id)
-                                }
+                                vistaModelo.eliminarRestriccionHorario(uidHijo, it.id)
                             },
                             onToggleEnabled = {
-                                uidHijo.let { id ->
-                                    vistaModelo.guardarRestriccionHorario(id, it.copy(isEnabled = !it.isEnabled))
-                                }
+                                vistaModelo.guardarRestriccionHorario(uidHijo, it.copy(isEnabled = !it.isEnabled))
                             },
                             primaryDark = primaryDark,
                             primaryLight = primaryLight,
@@ -235,8 +184,7 @@ fun PantallaProgramarRestricciones(
         }
     }
 
-    if (showAddEditDialog && hijoSeleccionado != null) {
-        val uidHijo = hijoSeleccionado?.first ?: ""
+    if (showAddEditDialog) {
         AddEditRestriccionDialog(
             restriccion = editingRestriction,
             onDismiss = { showAddEditDialog = false },
@@ -255,6 +203,8 @@ fun PantallaProgramarRestricciones(
         )
     }
 }
+
+// ... Resto del código de RestriccionHorarioCard y AddEditRestriccionDialog se mantiene igual ...
 
 @Composable
 fun RestriccionHorarioCard(

@@ -22,8 +22,7 @@ fun PantallaPrincipal(
     onIrAReporteApps: (List<Pair<String, String>>) -> Unit,
     onIrAControlApps: (List<Pair<String, String>>) -> Unit,
     onIrADispositivosVinculados: () -> Unit,
-    // <<-- ¡CAMBIO AQUÍ! Ahora la función de navegación recibe el uidHijo Y la lista de hijos.
-    onIrAProgramarRestricciones: (String, List<Pair<String, String>>) -> Unit
+    onIrAProgramarRestricciones: (List<Pair<String, String>>) -> Unit
 ) {
     val vistaModelo: VistaModeloApps = viewModel()
     val hijosVinculados by vistaModelo.hijosVinculados.collectAsState()
@@ -87,13 +86,8 @@ fun PantallaPrincipal(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // <<-- ¡CAMBIO AQUÍ! Ahora el onClick llama a la función con ambos parámetros.
             Button(
-                onClick = {
-                    hijosVinculados.firstOrNull()?.let { (uidHijo, _) ->
-                        onIrAProgramarRestricciones(uidHijo, hijosVinculados)
-                    }
-                },
+                onClick = { onIrAProgramarRestricciones(hijosVinculados) },
                 enabled = hijosVinculados.isNotEmpty(),
                 shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF99CCFF)),

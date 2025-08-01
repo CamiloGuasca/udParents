@@ -22,11 +22,8 @@ import com.example.udparents.vista.pantallas.PantallaProgramarRestricciones
 import com.example.udparents.vista.pantallas.PantallaRegistro
 import com.example.udparents.vista.pantallas.PantallaRecuperarContrasena
 import com.example.udparents.vista.pantallas.PantallaReporteApps
-import com.example.udparents.vista.pantallas.PantallaSeleccionHijoParaControl
+import com.example.udparents.vista.pantallas.PantallaSeleccionHijo // Usamos la nueva pantalla genérica
 import com.example.udparents.vista.pantallas.PantallaVinculacionHijo
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.listSaver
-import androidx.compose.runtime.saveable.rememberSaveable
 
 /**
  * Rutas nombradas para facilitar la navegación.
@@ -42,8 +39,9 @@ object Rutas {
     const val DISPOSITIVOS_VINCULADOS = "dispositivos_vinculados"
     const val REPORTE_APPS = "reporte_apps"
     const val CONTROL_APPS = "control_apps"
-    // He quitado el argumento de la ruta para usar savedStateHandle
     const val PROGRAMAR_RESTRICCIONES = "programar_restricciones"
+    const val DETALLES_RESTRICCIONES = "programar_restricciones_detalles/{uidHijo}/{nombreHijo}"
+    const val DETALLES_CONTROL = "control_apps/{uidHijo}"
 }
 
 /**
@@ -57,7 +55,6 @@ fun NavegacionApp() {
         navController = navController,
         startDestination = Rutas.BIENVENIDA
     ) {
-        // Pantalla de INICIO DE SESIÓN
         composable(Rutas.INICIO_SESION) {
             PantallaInicioSesion(
                 onIniciarSesionExitoso = {
@@ -73,8 +70,6 @@ fun NavegacionApp() {
                 }
             )
         }
-
-        // Pantalla de REGISTRO
         composable(Rutas.REGISTRO) {
             val viewModel = remember { VistaModeloUsuario() }
 
@@ -129,24 +124,19 @@ fun NavegacionApp() {
                         "hijosVinculados",
                         hijos
                     )
+                    // Navegamos a la pantalla de selección con un título
                     navController.navigate(Rutas.CONTROL_APPS)
                 },
-                onIrAProgramarRestricciones = { uidHijo, hijos ->
-                    // Guardamos la lista de hijos y el UID del hijo seleccionado
+                onIrAProgramarRestricciones = { hijos ->
                     navController.currentBackStackEntry?.savedStateHandle?.set(
                         "hijosVinculados",
                         hijos
                     )
-                    navController.currentBackStackEntry?.savedStateHandle?.set(
-                        "uidHijoInicial",
-                        uidHijo
-                    )
+                    // Navegamos a la pantalla de selección con un título diferente
                     navController.navigate(Rutas.PROGRAMAR_RESTRICCIONES)
                 }
             )
         }
-
-
         composable(Rutas.CODIGO_PADRE) {
             PantallaCodigoPadre(
                 onVolverAlMenuPrincipal = {
@@ -156,8 +146,6 @@ fun NavegacionApp() {
                 }
             )
         }
-
-
         composable(Rutas.DISPOSITIVOS_VINCULADOS) {
             PantallaDispositivosVinculados(
                 onVolverAlMenuPadre = {
@@ -167,8 +155,6 @@ fun NavegacionApp() {
                 }
             )
         }
-
-
         composable(Rutas.VINCULACION_HIJO) {
             PantallaVinculacionHijo(
                 vistaModelo = viewModel(),
@@ -179,7 +165,6 @@ fun NavegacionApp() {
                 }
             )
         }
-
         composable(Rutas.BIENVENIDA) {
             PantallaBienvenida(
                 onPadreSeleccionado = {
@@ -190,7 +175,6 @@ fun NavegacionApp() {
                 }
             )
         }
-
         composable(Rutas.REPORTE_APPS) {
             val hijos = navController.previousBackStackEntry
                 ?.savedStateHandle
@@ -204,56 +188,67 @@ fun NavegacionApp() {
                 }
             )
         }
-
+        // Ruta para la pantalla de selección de hijo para Control de Apps
         composable(Rutas.CONTROL_APPS) {
             val hijos = navController.previousBackStackEntry
                 ?.savedStateHandle
                 ?.get<List<Pair<String, String>>>("hijosVinculados")
                 ?: emptyList()
 
-            if (hijos.isNotEmpty()) {
-                // Muestra una pantalla simple para elegir el hijo antes de mostrar control de apps
-                PantallaSeleccionHijoParaControl(
-                    listaHijos = hijos,
-                    onHijoSeleccionado = { uidHijo ->
-                        navController.currentBackStackEntry?.savedStateHandle?.set("uidHijo", uidHijo)
-                        navController.navigate("control_apps_detalles")
-                    },
-                    onVolver = {
-                        navController.popBackStack()
-                    }
-                )
-            }
+            PantallaSeleccionHijo(
+                titulo = "Control de Aplicaciones",
+                listaHijos = hijos,
+                onHijoSeleccionado = { uidHijo, _ ->
+                    navController.navigate(Rutas.DETALLES_CONTROL.replace("{uidHijo}", uidHijo))
+                },
+                onVolver = {
+                    navController.popBackStack()
+                }
+            )
         }
-
-        // La pantalla de control de apps ahora es un composable separado
-        composable("control_apps_detalles") {
-            val uidHijo = navController.previousBackStackEntry
-                ?.savedStateHandle
-                ?.get<String>("uidHijo") ?: ""
-            PantallaControlApps(uidHijo = uidHijo)
-        }
-
-        // --- AQUI ESTA LA RUTA CORREGIDA CON EL PATRÓN CONSISTENTE ---
+        // Ruta para la pantalla de selección de hijo para Programar Restricciones
         composable(Rutas.PROGRAMAR_RESTRICCIONES) {
             val hijos = navController.previousBackStackEntry
                 ?.savedStateHandle
                 ?.get<List<Pair<String, String>>>("hijosVinculados")
                 ?: emptyList()
 
-            val uidHijoInicial = navController.previousBackStackEntry
-                ?.savedStateHandle
-                ?.get<String>("uidHijoInicial")
-
-            // Verificamos que los datos necesarios existan antes de mostrar la pantalla
-            if (hijos.isNotEmpty() && uidHijoInicial != null) {
+            PantallaSeleccionHijo(
+                titulo = "Programar Restricciones",
+                listaHijos = hijos,
+                onHijoSeleccionado = { uidHijo, nombreHijo ->
+                    navController.navigate(Rutas.DETALLES_RESTRICCIONES.replace("{uidHijo}", uidHijo).replace("{nombreHijo}", nombreHijo))
+                },
+                onVolver = {
+                    navController.popBackStack()
+                }
+            )
+        }
+        // Ruta de destino para la pantalla de detalles de Control de Apps
+        composable(
+            route = Rutas.DETALLES_CONTROL,
+            arguments = listOf(navArgument("uidHijo") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val uidHijo = backStackEntry.arguments?.getString("uidHijo") ?: ""
+            PantallaControlApps(uidHijo = uidHijo)
+        }
+        // Ruta de destino para la pantalla de detalles de Programar Restricciones
+        composable(
+            route = Rutas.DETALLES_RESTRICCIONES,
+            arguments = listOf(
+                navArgument("uidHijo") { type = NavType.StringType },
+                navArgument("nombreHijo") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val uidHijo = backStackEntry.arguments?.getString("uidHijo")
+            val nombreHijo = backStackEntry.arguments?.getString("nombreHijo")
+            if (uidHijo != null && nombreHijo != null) {
                 PantallaProgramarRestricciones(
-                    listaHijos = hijos,
-                    uidHijoInicial = uidHijoInicial,
+                    uidHijo = uidHijo,
+                    nombreHijo = nombreHijo,
                     onVolver = { navController.popBackStack() }
                 )
             }
         }
-
     }
 }

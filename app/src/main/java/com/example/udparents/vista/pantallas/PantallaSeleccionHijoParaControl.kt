@@ -3,105 +3,91 @@ package com.example.udparents.vista.pantallas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-@OptIn(ExperimentalMaterial3Api::class) // Necesario para TopAppBarDefaults.topAppBarColors
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PantallaSeleccionHijoParaControl(
+fun PantallaSeleccionHijo(
+    titulo: String,
     listaHijos: List<Pair<String, String>>,
-    onHijoSeleccionado: (String) -> Unit,
+    onHijoSeleccionado: (String, String) -> Unit, // Ahora pasamos el UID y el nombre
     onVolver: () -> Unit
 ) {
-    // --- PALETA DE COLORES PARA ESTA PANTALLA (Tema Teal) ---
-    val primaryDarkTeal = Color(0xFF004D40) // Verde azulado oscuro muy profundo (fondo principal)
-    val primaryLightTeal = Color(0xFF00796B) // Verde azulado primario para TopAppBar
-    val accentCyan = Color(0xFF00BCD4) // Cian brillante para botones de acción y texto destacado
-    val onPrimaryColor = Color.White // Texto sobre colores primarios
-    val surfaceDarkTeal = Color(0xFF263238) // Gris oscuro/casi negro azulado para elementos de lista
-    val onSurfaceColor = Color(0xFFB2DFDB) // Texto claro sobre surfaceDarkTeal
-    val dividerColor = Color(0xFF4DB6AC) // Tono de verde azulado para divisores
+    // --- PALETA DE COLORES (Coherente con las otras pantallas) ---
+    val primaryDark = Color(0xFF1A237E)
+    val primaryLight = Color(0xFF3F51B5)
+    val accentColor = Color(0xFFCDDC39)
+    val onPrimaryColor = Color.White
+    val surfaceColor = Color(0xFF2C387F)
+    val onSurfaceColor = Color(0xFFE8EAF6)
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Selecciona un Hijo", color = onPrimaryColor) },
+                title = { Text(titulo, color = onPrimaryColor) },
                 navigationIcon = {
                     IconButton(onClick = onVolver) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = onPrimaryColor)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = primaryLightTeal, // Color de la barra superior
-                    titleContentColor = onPrimaryColor // Color del título
+                    containerColor = primaryLight,
+                    titleContentColor = onPrimaryColor
                 )
             )
         },
-        containerColor = primaryDarkTeal // Color de fondo del Scaffold
+        containerColor = primaryDark
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues) // Aplica el padding del Scaffold
-                .padding(horizontal = 16.dp, vertical = 8.dp) // Padding adicional para el contenido
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Text(
-                "Selecciona el perfil del hijo que deseas controlar:",
+                text = "Selecciona el perfil del hijo:",
                 style = MaterialTheme.typography.titleLarge,
-                color = onPrimaryColor, // Color de texto acorde al tema
+                color = onPrimaryColor,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // Lista de hijos
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(surfaceDarkTeal, shape = MaterialTheme.shapes.medium) // Fondo para la lista con esquinas redondeadas
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                listaHijos.forEach { (uid, nombre) ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onHijoSeleccionado(uid) }
-                            .padding(vertical = 12.dp, horizontal = 8.dp)
+                items(listaHijos) { (uidHijo, nombreHijo) ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onHijoSeleccionado(uidHijo, nombreHijo) },
+                        colors = CardDefaults.cardColors(containerColor = surfaceColor, contentColor = onPrimaryColor),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text(
-                            text = nombre,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = onPrimaryColor // Texto blanco para el nombre del hijo
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "ID: $uid", // Mostrar el UID para referencia
-                            style = MaterialTheme.typography.bodySmall,
-                            color = onSurfaceColor // Texto más claro para el UID
-                        )
-                    }
-                    // Divisor entre elementos, con color que combine
-                    if (listaHijos.last() != Pair(uid, nombre)) { // No mostrar divisor después del último elemento
-                        Divider(color = dividerColor.copy(alpha = 0.5f), thickness = 1.dp)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp)
+                        ) {
+                            Text(
+                                text = nombreHijo,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp)) // Espacio antes del botón
-
-            // Botón Volver
-            Button(
-                onClick = { onVolver() },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = accentCyan, // Fondo en cian brillante
-                    contentColor = primaryDarkTeal // Texto en verde azulado oscuro para contraste
-                )
-            ) {
-                Text("Volver al Inicio")
             }
         }
     }
