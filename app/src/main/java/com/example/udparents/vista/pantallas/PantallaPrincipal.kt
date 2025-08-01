@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -20,7 +21,9 @@ fun PantallaPrincipal(
     onIrAVinculacionPadre: () -> Unit,
     onIrAReporteApps: (List<Pair<String, String>>) -> Unit,
     onIrAControlApps: (List<Pair<String, String>>) -> Unit,
-    onIrADispositivosVinculados: () -> Unit
+    onIrADispositivosVinculados: () -> Unit,
+    // <<-- Nuevo parámetro de navegación
+    onIrAProgramarRestricciones: (String) -> Unit
 ) {
     val vistaModelo: VistaModeloApps = viewModel()
     val hijosVinculados by vistaModelo.hijosVinculados.collectAsState()
@@ -45,7 +48,7 @@ fun PantallaPrincipal(
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Bienvenido 👋", fontSize = 24.sp, color = Color(0xFF003366))
+            Text("Bienvenido 👋", fontSize = 24.sp, color = Color(0xFF003366), textAlign = TextAlign.Center)
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
@@ -80,6 +83,25 @@ fun PantallaPrincipal(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Ver historial de uso", color = Color.White)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // <<-- Nuevo botón para ir a la pantalla de restricciones
+            Button(
+                onClick = {
+                    // Aquí asumimos que quieres programar restricciones para el primer hijo.
+                    // Si tienes una lista de hijos, podrías mostrar un diálogo para seleccionar uno.
+                    hijosVinculados.firstOrNull()?.let { (uidHijo, _) ->
+                        onIrAProgramarRestricciones(uidHijo)
+                    }
+                },
+                enabled = hijosVinculados.isNotEmpty(),
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF99CCFF)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Programar restricciones", color = Color.White)
             }
 
             Spacer(modifier = Modifier.height(16.dp))

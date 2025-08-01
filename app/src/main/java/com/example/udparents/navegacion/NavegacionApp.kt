@@ -11,6 +11,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.listSaver
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.example.udparents.viewmodel.VistaModeloUsuario
 import com.example.udparents.vista.pantallas.PantallaBienvenida
 import com.example.udparents.vista.pantallas.PantallaCodigoPadre
@@ -18,6 +20,7 @@ import com.example.udparents.vista.pantallas.PantallaControlApps
 import com.example.udparents.vista.pantallas.PantallaDispositivosVinculados
 import com.example.udparents.vista.pantallas.PantallaInicioSesion
 import com.example.udparents.vista.pantallas.PantallaPrincipal
+import com.example.udparents.vista.pantallas.PantallaProgramarRestricciones
 import com.example.udparents.vista.pantallas.PantallaRegistro
 import com.example.udparents.vista.pantallas.PantallaRecuperarContrasena
 import com.example.udparents.vista.pantallas.PantallaReporteApps
@@ -38,6 +41,7 @@ object Rutas {
     const val DISPOSITIVOS_VINCULADOS = "dispositivos_vinculados"
     const val REPORTE_APPS = "reporte_apps"
     const val CONTROL_APPS = "control_apps"
+    const val PROGRAMAR_RESTRICCIONES = "programar_restricciones/{uidHijo}" // <<-- Nueva ruta con argumento
 
 }
 
@@ -125,11 +129,12 @@ fun NavegacionApp() {
                         hijos
                     )
                     navController.navigate(Rutas.CONTROL_APPS)
+                },
+                // <<-- Nuevo parámetro para la pantalla de restricciones
+                onIrAProgramarRestricciones = { uidHijo ->
+                    navController.navigate("programar_restricciones/$uidHijo")
                 }
-
-
             )
-
         }
 
 
@@ -216,7 +221,18 @@ fun NavegacionApp() {
             val uidHijo = backStackEntry.arguments?.getString("uidHijo") ?: ""
             PantallaControlApps(uidHijo = uidHijo)
         }
-
+        composable(
+            route = Rutas.PROGRAMAR_RESTRICCIONES,
+            arguments = listOf(navArgument("uidHijo") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val uidHijo = backStackEntry.arguments?.getString("uidHijo")
+            if (uidHijo != null) {
+                PantallaProgramarRestricciones(
+                    uidHijo = uidHijo,
+                    onVolver = { navController.popBackStack() }
+                )
+            }
+        }
 
     }
 }

@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.udparents.modelo.AppUso
+import com.example.udparents.modelo.RestriccionHorario
 import com.example.udparents.repositorio.RepositorioApps
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +23,41 @@ class VistaModeloApps : ViewModel() {
     val estadoBloqueoApp: StateFlow<Map<String, Boolean>> = _estadoBloqueoApp
     private val _limitesApp = MutableStateFlow<Map<String, Long>>(emptyMap())
     val limitesApp: StateFlow<Map<String, Long>> = _limitesApp
+    private val _restriccionesHorario = MutableStateFlow<List<RestriccionHorario>>(emptyList())
+    val restriccionesHorario: StateFlow<List<RestriccionHorario>> = _restriccionesHorario
+
+    fun cargarRestriccionesHorario(uidHijo: String) {
+        viewModelScope.launch {
+            try {
+                _restriccionesHorario.value = repositorio.obtenerRestriccionesHorario(uidHijo)
+                Log.d("VistaModeloApps", "Restricciones de horario cargadas: ${_restriccionesHorario.value.size}")
+            } catch (e: Exception) {
+                Log.e("VistaModeloApps", "Error al cargar restricciones de horario: ${e.message}", e)
+            }
+        }
+    }
+
+    fun guardarRestriccionHorario(uidHijo: String, restriccion: RestriccionHorario) {
+        viewModelScope.launch {
+            try {
+                repositorio.guardarRestriccionHorario(uidHijo, restriccion)
+                cargarRestriccionesHorario(uidHijo) // Recargar para actualizar la UI
+            } catch (e: Exception) {
+                Log.e("VistaModeloApps", "Error al guardar restricción de horario: ${e.message}", e)
+            }
+        }
+    }
+
+    fun eliminarRestriccionHorario(uidHijo: String, restriccionId: String) {
+        viewModelScope.launch {
+            try {
+                repositorio.eliminarRestriccionHorario(uidHijo, restriccionId)
+                cargarRestriccionesHorario(uidHijo) // Recargar para actualizar la UI
+            } catch (e: Exception) {
+                Log.e("VistaModeloApps", "Error al eliminar restricción de horario: ${e.message}", e)
+            }
+        }
+    }
 
     fun cargarUsos(uidHijo: String, desde: Long, hasta: Long) {
         viewModelScope.launch {

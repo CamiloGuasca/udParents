@@ -16,7 +16,11 @@ class PantallaBloqueoComposeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Obtener el nombre de la app y el motivo del bloqueo del Intent
         val nombreApp = intent.getStringExtra("nombreApp") ?: "Esta aplicación"
+        // Se añade la línea para obtener el motivo del bloqueo.
+        // Si no se encuentra, se usará un mensaje por defecto.
+        val motivoBloqueo = intent.getStringExtra("motivoBloqueo") ?: "bloqueada por la configuración de UD Parents"
 
         // Bloquear botón atrás
         val callback = object : OnBackPressedCallback(true) {
@@ -46,7 +50,11 @@ class PantallaBloqueoComposeActivity : ComponentActivity() {
         // Mostrar pantalla visual
         setContent {
             UdParentsTheme {
-                PantallaBloqueoApp(nombreApp = nombreApp)
+                // Se actualiza la llamada al Composable para pasar el motivo del bloqueo
+                PantallaBloqueoApp(
+                    nombreApp = nombreApp,
+                    motivoBloqueo = motivoBloqueo // <<-- Se añade este parámetro
+                )
             }
         }
     }

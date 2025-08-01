@@ -24,7 +24,7 @@ class RegistroUsoService : Service() {
     private var tareaMonitoreo: Job? = null
     private var tareaRegistroUso: Job? = null
     private val intervaloChequeoAppEnUso = 3000L // 3 segundos para el chequeo de bloqueo y el incremento "en vivo"
-    private val intervaloRegistroUso = 30 * 1000L // <-- Asegúrate que sea 30 segundos aquí
+    private val intervaloRegistroUso = 30 * 1000L // 30 segundos para registrar el uso en Firebase (barrido general)
     private var paqueteBloqueadoActual: String? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -96,26 +96,76 @@ class RegistroUsoService : Service() {
         // Ahora, obtenemos el tiempo de uso *después* de haberlo incrementado
         val tiempoUsoActual = repositorio.obtenerUsoAppDelDia(uidHijo, paqueteActual)
 
-        val bloqueadaManual = repositorio.estaAppBloqueada(uidHijo, paqueteActual)
-        val tiempoLimite = repositorio.obtenerLimiteApp(uidHijo, paqueteActual)
-        val bloqueadaPorLimite = tiempoLimite > 0L && tiempoUsoActual >= tiempoLimite
+        var debeBloquear = false
+        var motivoBloqueo = "Desconocido"
 
-        val debeBloquear = bloqueadaManual || bloqueadaPorLimite
+        // 1. Verificar bloqueo manual
+        val bloqueadaManual = repositorio.estaAppBloqueada(uidHijo, paqueteActual)
+        if (bloqueadaManual) {
+            debeBloquear = true
+            motivoBloqueo = "Bloqueo manual"
+        }
+
+        // 2. Verificar bloqueo por límite de tiempo (solo si no está ya bloqueada manualmente)
+        if (!debeBloquear) {
+            val tiempoLimite = repositorio.obtenerLimiteApp(uidHijo, paqueteActual)
+            val bloqueadaPorLimite = tiempoLimite > 0L && tiempoUsoActual >= tiempoLimite
+            if (bloqueadaPorLimite) {
+                debeBloquear = true
+                motivoBloqueo = "Límite de tiempo excedido"
+            }
+        }
+
+        // 3. Verificar bloqueo por horario (solo si no está ya bloqueada por las razones anteriores)
+        if (!debeBloquear) {
+            val restricciones = repositorio.obtenerRestriccionesHorario(uidHijo)
+            val calendar = Calendar.getInstance()
+            // Calendar.DAY_OF_WEEK usa: Domingo=1, Lunes=2, ..., Sábado=7
+            val currentDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+            val currentTimeMillisOfDay = (calendar.get(Calendar.HOUR_OF_DAY) * 60 * 60 * 1000) +
+                    (calendar.get(Calendar.MINUTE) * 60 * 1000) +
+                    (calendar.get(Calendar.SECOND) * 1000)
+
+            for (restriccion in restricciones) {
+                if (restriccion.isEnabled &&
+                    (restriccion.packageName == paqueteActual || restriccion.packageName == "ALL_APPS") &&
+                    restriccion.daysOfWeek.contains(currentDayOfWeek)
+                ) {
+                    // Lógica para comprobar si la hora actual está dentro de la franja de bloqueo
+                    if (restriccion.startTimeMillis < restriccion.endTimeMillis) {
+                        // Horario normal (ej. 08:00 - 17:00)
+                        if (currentTimeMillisOfDay >= restriccion.startTimeMillis &&
+                            currentTimeMillisOfDay < restriccion.endTimeMillis) {
+                            debeBloquear = true
+                            motivoBloqueo = "Restricción por horario"
+                            break
+                        }
+                    } else {
+                        // Horario que cruza la medianoche (ej. 22:00 - 06:00)
+                        // Si la hora actual es mayor o igual a la hora de inicio (ej. 22:00)
+                        // O si la hora actual es menor que la hora de fin (ej. 06:00)
+                        if (currentTimeMillisOfDay >= restriccion.startTimeMillis ||
+                            currentTimeMillisOfDay < restriccion.endTimeMillis) {
+                            debeBloquear = true
+                            motivoBloqueo = "Restricción por horario"
+                            break
+                        }
+                    }
+                }
+            }
+        }
+
 
         if (debeBloquear) {
             if (paqueteActual != paqueteBloqueadoActual) {
                 paqueteBloqueadoActual = paqueteActual
-                val motivoBloqueo = when {
-                    bloqueadaManual -> "Bloqueo manual"
-                    bloqueadaPorLimite -> "Límite de tiempo excedido"
-                    else -> "Desconocido"
-                }
                 Log.d("RegistroUsoService", "🔒 App bloqueada detectada: $nombreAppActual ($paqueteActual) - Motivo: $motivoBloqueo")
 
                 val intent = Intent(context, PantallaBloqueoComposeActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                     putExtra("nombreApp", nombreAppActual)
                     putExtra("paqueteBloqueado", paqueteActual)
+                    putExtra("motivoBloqueo", motivoBloqueo) // Opcional: pasar el motivo a la pantalla de bloqueo
                 }
                 context.startActivity(intent)
             }

@@ -4,6 +4,7 @@ import com.example.udparents.modelo.AppUso
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import android.util.Log
+import com.example.udparents.modelo.RestriccionHorario
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import java.util.Calendar
@@ -66,6 +67,40 @@ class RepositorioApps {
             } else {
                 Log.e(TAG, "❌ Error inesperado al incrementar/crear uso de $packageName: ${e.message}", e)
             }
+        }
+    }
+    suspend fun guardarRestriccionHorario(uidHijo: String, restriccion: RestriccionHorario) {
+        val docRef = db.collection("hijos").document(uidHijo)
+            .collection("horarios_restriccion").document(restriccion.id.ifEmpty { db.collection("hijos").document(uidHijo).collection("horarios_restriccion").document().id }) // Genera ID si está vacío
+        try {
+            docRef.set(restriccion).await()
+            Log.d(TAG, "✅ Restricción de horario guardada/actualizada: ${restriccion.ruleName} (ID: ${docRef.id})")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error al guardar restricción de horario: ${e.message}", e)
+        }
+    }
+
+    suspend fun obtenerRestriccionesHorario(uidHijo: String): List<RestriccionHorario> {
+        return try {
+            val snapshot = db.collection("hijos").document(uidHijo)
+                .collection("horarios_restriccion")
+                .get()
+                .await()
+            snapshot.documents.mapNotNull { it.toObject(RestriccionHorario::class.java) }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error al obtener restricciones de horario: ${e.message}", e)
+            emptyList()
+        }
+    }
+
+    suspend fun eliminarRestriccionHorario(uidHijo: String, restriccionId: String) {
+        try {
+            db.collection("hijos").document(uidHijo)
+                .collection("horarios_restriccion").document(restriccionId)
+                .delete().await()
+            Log.d(TAG, "✅ Restricción de horario eliminada: $restriccionId")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error al eliminar restricción de horario: ${e.message}", e)
         }
     }
 

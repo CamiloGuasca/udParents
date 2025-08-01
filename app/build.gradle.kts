@@ -50,7 +50,13 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
+    //implementation(libs.androidx.material3)
+    // Necesario para usar FlowRow (ExperimentalLayoutApi)
+    implementation("androidx.compose.foundation:foundation-layout:1.6.0")
+    implementation("androidx.compose.material3:material3:1.2.1") // 👈 versión explícita si la anterior falla
+    implementation("androidx.compose.material:material-icons-extended:1.6.1")
+// Asegúrate de tener esta también (ya la tienes probablemente en libs.androidx.material3, pero mejor explícita si tienes errores)
+
 
     // Dependencias de Navegación (Compose)
     implementation(libs.androidx.navigation.runtime.android)

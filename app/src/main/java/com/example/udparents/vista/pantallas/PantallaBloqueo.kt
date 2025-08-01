@@ -8,11 +8,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun PantallaBloqueoApp(nombreApp: String) {
+fun PantallaBloqueoApp(
+    nombreApp: String,
+    motivoBloqueo: String // <<-- ¡Ahora la función acepta el motivo del bloqueo!
+) {
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -34,15 +38,26 @@ fun PantallaBloqueoApp(nombreApp: String) {
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "La aplicación \"$nombreApp\" ha sido bloqueada por tus padres.",
+                text = "La aplicación \"$nombreApp\" ha sido bloqueada.",
                 fontSize = 18.sp,
-                color = Color.White
+                color = Color.White,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            // Se añade un nuevo Text para mostrar el motivo específico.
+            Text(
+                text = "Motivo: $motivoBloqueo",
+                fontSize = 16.sp,
+                color = Color.White,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = "Si necesitas acceso, consulta con ellos.",
                 fontSize = 14.sp,
-                color = Color.Gray
+                color = Color.Gray,
+                textAlign = TextAlign.Center
             )
         }
     }
