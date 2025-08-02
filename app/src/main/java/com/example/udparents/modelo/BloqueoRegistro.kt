@@ -8,10 +8,12 @@ import java.util.Date
  * Se utiliza para registrar la información en Firestore.
  */
 data class BloqueoRegistro(
-    val nombreApp: String = "",
-    val nombrePaquete: String = "",
     val uidHijo: String = "",
+    val nombrePaquete: String = "",
+    val nombreApp: String = "",
     val razon: String = "",
-    @ServerTimestamp // Anota para que Firestore establezca automáticamente la hora del servidor
-    val timestamp: Date? = null
+    val contadorIntentos: Long = 1,
+    val intentos: List<String> = listOf(), // lista de timestamps tipo "12:34:56"
+    val fecha: String = "" // "2025-08-02"
 )
+

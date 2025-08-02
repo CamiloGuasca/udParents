@@ -4,65 +4,74 @@ import android.util.Log
 import com.example.udparents.modelo.BloqueoRegistro
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
+import java.text.SimpleDateFormat
+import java.util.*
 
-/**
- * Repositorio para manejar los datos de los registros de bloqueos en Firestore.
- * Utiliza un modelo de datos llamado BloqueoRegistro y se comunica con la base de datos de Firebase.
- */
 class RepositorioBloqueos {
 
-    // Instancia de Firestore para interactuar con la base de datos
     private val db = FirebaseFirestore.getInstance()
     private val TAG = "RepositorioBloqueos"
 
-    /**
-     * Registra un intento de acceso bloqueado en Firestore.
-     * La colección será `hijos/{uidHijo}/registros_bloqueo`.
-     * Cada registro tendrá un ID único generado automáticamente por Firestore.
-     * @param uidHijo El UID del hijo al que se le ha bloqueado la aplicación.
-     * @param bloqueo El objeto [BloqueoRegistro] que contiene toda la información del evento.
-     */
-    suspend fun registrarBloqueo(uidHijo: String, bloqueo: BloqueoRegistro) {
-        // Obtenemos la referencia a la colección específica para los registros de bloqueo del hijo
-        val docRef = db.collection("hijos").document(uidHijo)
+    suspend fun registrarBloqueo(uidHijo: String, nuevoBloqueo: BloqueoRegistro) {
+        val fecha = obtenerFechaActual()
+        val hora = obtenerHoraActual()
+        val paquete = nuevoBloqueo.nombrePaquete
+
+        val docId = "$fecha-$paquete"
+        val docRef = db.collection("hijos")
+            .document(uidHijo)
             .collection("registros_bloqueo")
-            .document() // Firestore generará un ID único automáticamente para el documento
+            .document(docId)
 
         try {
-            // Guardamos el objeto BloqueoRegistro en el nuevo documento
-            docRef.set(bloqueo).await()
-            Log.d(TAG, "✅ Intento de acceso bloqueado registrado para: ${bloqueo.nombreApp}")
+            db.runTransaction { transaction ->
+                val snapshot = transaction.get(docRef)
+                if (snapshot.exists()) {
+                    val contadorActual = snapshot.getLong("contadorIntentos") ?: 0
+                    val intentosActuales = snapshot.get("intentos") as? List<String> ?: listOf()
+                    val nuevosIntentos = intentosActuales + hora
+                    val actualizaciones = mapOf(
+                        "contadorIntentos" to contadorActual + 1,
+                        "intentos" to nuevosIntentos
+                    )
+                    transaction.update(docRef, actualizaciones)
+                } else {
+                    val nuevoRegistro = nuevoBloqueo.copy(
+                        fecha = fecha,
+                        contadorIntentos = 1,
+                        intentos = listOf(hora)
+                    )
+                    transaction.set(docRef, nuevoRegistro)
+                }
+            }.await()
+            Log.d(TAG, "✅ Registro de intento de acceso actualizado correctamente.")
         } catch (e: Exception) {
-            // Manejamos cualquier error que pueda ocurrir durante la operación de guardado
-            Log.e(TAG, "❌ Error al registrar bloqueo para ${bloqueo.nombreApp}: ${e.message}", e)
+            Log.e(TAG, "❌ Error al registrar intento de bloqueo: ${e.message}", e)
         }
     }
 
-    /**
-     * Obtiene una lista de registros de bloqueos para un hijo específico.
-     * La lista se ordena por la marca de tiempo (timestamp) de forma descendente,
-     * mostrando los bloqueos más recientes primero.
-     * @param uidHijo El UID del hijo.
-     * @return Una lista de objetos [BloqueoRegistro] si se encuentran, o una lista vacía
-     * si no hay registros o si ocurre un error.
-     */
     suspend fun obtenerRegistrosDeBloqueo(uidHijo: String): List<BloqueoRegistro> {
         return try {
-            // Obtenemos la instantánea de la colección de registros de bloqueo del hijo
             val snapshot = db.collection("hijos").document(uidHijo)
                 .collection("registros_bloqueo")
                 .get()
                 .await()
 
-            // Mapeamos los documentos de Firestore a objetos BloqueoRegistro
-            // La ordenación se realiza en memoria después de obtener los datos para evitar
-            // la necesidad de crear índices compuestos en Firestore, lo cual simplifica la configuración.
-            val bloqueos = snapshot.documents.mapNotNull { it.toObject(BloqueoRegistro::class.java) }
-            bloqueos.sortedByDescending { it.timestamp }
+            snapshot.documents.mapNotNull { it.toObject(BloqueoRegistro::class.java) }
+                .sortedByDescending { it.fecha }
         } catch (e: Exception) {
-            // Manejamos cualquier error que pueda ocurrir al obtener los datos
             Log.e(TAG, "❌ Error al obtener registros de bloqueo: ${e.message}", e)
             emptyList()
         }
+    }
+
+    private fun obtenerFechaActual(): String {
+        val formato = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        return formato.format(Date())
+    }
+
+    private fun obtenerHoraActual(): String {
+        val formato = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+        return formato.format(Date())
     }
 }

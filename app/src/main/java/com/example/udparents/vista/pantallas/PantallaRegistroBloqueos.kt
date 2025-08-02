@@ -26,7 +26,7 @@ import java.util.*
 
 // =================================================================================================
 // PANTALLA PARA HU-014: Registro de Intentos de Acceso Bloqueados
-// Muestra un registro de los intentos de acceso a apps bloqueadas usando datos reales.
+// Muestra un registro de los intentos de acceso a apps bloqueadas de forma consolidada.
 // =================================================================================================
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,34 +39,28 @@ fun PantallaRegistroBloqueos(
     val usuario = FirebaseAuth.getInstance().currentUser
     val idPadre = usuario?.uid ?: ""
 
-    // Estado para el hijo seleccionado (UID y nombre)
     var hijoSeleccionado by remember {
         mutableStateOf<Pair<String, String>?>(null)
     }
 
-    // NUEVO: Observa los registros de bloqueo desde el ViewModel
     val registroBloqueos by viewModel.registroBloqueos.collectAsState()
 
-    // Carga inicial de hijos
     LaunchedEffect(Unit) {
         viewModel.cargarHijos(idPadre)
     }
 
-    // Se actualiza el hijo seleccionado si la lista de hijos vinculados no está vacía.
     LaunchedEffect(hijosVinculados) {
         if (hijosVinculados.isNotEmpty() && hijoSeleccionado == null) {
             hijoSeleccionado = hijosVinculados.first()
         }
     }
 
-    // Si el hijo seleccionado cambia, se cargan los nuevos datos de bloqueo.
     LaunchedEffect(hijoSeleccionado) {
         hijoSeleccionado?.let { hijo ->
             viewModel.cargarRegistroBloqueos(hijo.first)
         }
     }
 
-    // Paleta de colores consistente
     val primaryDark = Color(0xFF000033)
     val primaryLight = Color(0xFF3F51B5)
     val onPrimaryColor = Color.White
@@ -97,7 +91,6 @@ fun PantallaRegistroBloqueos(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Dropdown para seleccionar el hijo
             if (hijosVinculados.isNotEmpty()) {
                 HijoSelectorRegistroBloqueos(
                     hijos = hijosVinculados,
@@ -111,7 +104,6 @@ fun PantallaRegistroBloqueos(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            // Lista de registros de bloqueo
             if (registroBloqueos.isNotEmpty()) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -137,9 +129,6 @@ fun PantallaRegistroBloqueos(
     }
 }
 
-/**
- * Muestra un selector de hijo con un dropdown.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HijoSelectorRegistroBloqueos(
@@ -198,17 +187,12 @@ private fun HijoSelectorRegistroBloqueos(
     }
 }
 
-/**
- * Composable para mostrar un ítem de bloqueo en la lista.
- */
 @Composable
 private fun BloqueoItem(
     bloqueo: BloqueoRegistro,
     backgroundColor: Color,
     contentColor: Color
 ) {
-    val formatter = SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault())
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -218,7 +202,7 @@ private fun BloqueoItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
             Icon(
                 imageVector = Icons.Default.Lock,
@@ -237,14 +221,24 @@ private fun BloqueoItem(
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                // Usa el timestamp de Firebase (de tipo Date) si está disponible
-                val fechaFormateada = bloqueo.timestamp?.let { formatter.format(it) } ?: "Fecha desconocida"
+
                 Text(
-                    text = "Intentado a las: $fechaFormateada",
-                    color = contentColor.copy(alpha = 0.7f),
-                    fontSize = 14.sp
+                    text = "Intentos: ${bloqueo.contadorIntentos}",
+                    color = contentColor.copy(alpha = 0.8f),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(4.dp))
+
+                bloqueo.intentos.forEach { intento ->
+                    Text(
+                        text = "• $intento",
+                        color = contentColor.copy(alpha = 0.6f),
+                        fontSize = 12.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "Razón: ${bloqueo.razon}",
                     color = contentColor.copy(alpha = 0.7f),
