@@ -25,6 +25,10 @@ class VistaModeloApps : ViewModel() {
     val limitesApp: StateFlow<Map<String, Long>> = _limitesApp
     private val _restriccionesHorario = MutableStateFlow<List<RestriccionHorario>>(emptyList())
     val restriccionesHorario: StateFlow<List<RestriccionHorario>> = _restriccionesHorario
+    private val _tiempoPantallaDiario = MutableStateFlow<Map<String, Long>>(emptyMap())
+    val tiempoPantallaDiario: StateFlow<Map<String, Long>> = _tiempoPantallaDiario
+    private val _tiempoPantallaSemanal = MutableStateFlow<Map<Int, Long>>(emptyMap())
+    val tiempoPantallaSemanal: StateFlow<Map<Int, Long>> = _tiempoPantallaSemanal
 
     fun cargarRestriccionesHorario(uidHijo: String) {
         viewModelScope.launch {
@@ -130,6 +134,41 @@ class VistaModeloApps : ViewModel() {
                 Log.d("VistaModeloApps", "Límite establecido para $paquete: $tiempoLimite ms.")
             } catch (e: Exception) {
                 Log.e("VistaModeloApps", "Error al establecer límite para $paquete: ${e.message}", e)
+            }
+        }
+    }
+    /**
+     * Carga el resumen de tiempo de pantalla por día para un hijo específico.
+     * Los datos se almacenan en _tiempoPantallaDiario.
+     * @param uidHijo El UID del hijo del que se obtendrán los datos.
+     */
+    fun cargarResumenTiempoPantallaDiario(uidHijo: String) {
+        viewModelScope.launch {
+            try {
+                // Llama a una nueva función en el repositorio (que crearemos después).
+                val resumenDiario = repositorio.obtenerTiempoPantallaDiario(uidHijo)
+                _tiempoPantallaDiario.value = resumenDiario
+                Log.d("VistaModeloApps", "Resumen diario de tiempo de pantalla cargado: ${resumenDiario.size} días.")
+            } catch (e: Exception) {
+                Log.e("VistaModeloApps", "Error al cargar resumen diario: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
+     * Carga el resumen de tiempo de pantalla por semana para un hijo específico.
+     * Los datos se almacenan en _tiempoPantallaSemanal.
+     * @param uidHijo El UID del hijo del que se obtendrán los datos.
+     */
+    fun cargarResumenTiempoPantallaSemanal(uidHijo: String) {
+        viewModelScope.launch {
+            try {
+                // Llama a una nueva función en el repositorio (que crearemos después).
+                val resumenSemanal = repositorio.obtenerTiempoPantallaSemanal(uidHijo)
+                _tiempoPantallaSemanal.value = resumenSemanal
+                Log.d("VistaModeloApps", "Resumen semanal de tiempo de pantalla cargado: ${resumenSemanal.size} semanas.")
+            } catch (e: Exception) {
+                Log.e("VistaModeloApps", "Error al cargar resumen semanal: ${e.message}", e)
             }
         }
     }

@@ -22,7 +22,8 @@ fun PantallaPrincipal(
     onIrAReporteApps: (List<Pair<String, String>>) -> Unit,
     onIrAControlApps: (List<Pair<String, String>>) -> Unit,
     onIrADispositivosVinculados: () -> Unit,
-    onIrAProgramarRestricciones: (List<Pair<String, String>>) -> Unit
+    onIrAProgramarRestricciones: (List<Pair<String, String>>) -> Unit,
+    onIrAResumenTiempoPantalla: (List<Pair<String, String>>) -> Unit
 ) {
     val vistaModelo: VistaModeloApps = viewModel()
     val hijosVinculados by vistaModelo.hijosVinculados.collectAsState()
@@ -105,6 +106,18 @@ fun PantallaPrincipal(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Control de aplicaciones", color = Color.White)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = { onIrAResumenTiempoPantalla(hijosVinculados) },
+                enabled = hijosVinculados.isNotEmpty(),
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF336699)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+
+                Text("Resumen de Tiempo de Pantalla", color = Color.White)
             }
 
             Spacer(modifier = Modifier.height(16.dp))

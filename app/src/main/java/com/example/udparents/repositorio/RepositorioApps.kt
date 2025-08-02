@@ -10,6 +10,7 @@ import com.google.firebase.ktx.Firebase
 import java.util.Calendar
 import java.util.Date
 import com.google.firebase.firestore.FieldValue // ¡Importante: Añadir esta importación!
+import java.util.Locale
 
 class RepositorioApps {
 
@@ -247,5 +248,78 @@ class RepositorioApps {
         val month = calendar.get(Calendar.MONTH) + 1
         val day = calendar.get(Calendar.DAY_OF_MONTH)
         return "%04d-%02d-%02d".format(year, month, day)
+    }
+
+    /**
+     * Obtiene el tiempo total de pantalla por día para un hijo, solo de la última semana.
+     * Esto es más eficiente que cargar todos los datos históricos.
+     * @param uidHijo El UID del hijo.
+     * @return Un mapa donde la clave es la fecha (String) y el valor es el tiempo total en milisegundos (Long).
+     */
+    suspend fun obtenerTiempoPantallaDiario(uidHijo: String): Map<String, Long> {
+        return try {
+            val calendar = Calendar.getInstance()
+            // Obtener la fecha de inicio de la semana (lunes)
+            calendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+            val inicioSemana = calendar.timeInMillis
+
+            val snapshot = db.collection("hijos").document(uidHijo)
+                .collection("uso_apps")
+                // Filtra solo los datos de la última semana para mejorar el rendimiento
+                .whereGreaterThanOrEqualTo("fechaUso", inicioSemana)
+                .get()
+                .await()
+
+            // Agrupa todos los usos por fecha y suma el tiempo.
+            val resumen = snapshot.documents.mapNotNull { it.toObject(AppUso::class.java) }
+                .groupBy { formatearFecha(it.fechaUso) }
+                .mapValues { (_, usosDelDia) ->
+                    usosDelDia.sumOf { it.tiempoUso }
+                }
+            resumen
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error al obtener resumen de tiempo diario: ${e.message}", e)
+            emptyMap()
+        }
+    }
+
+    /**
+     * Obtiene el tiempo total de pantalla por semana para un hijo.
+     * La función ha sido corregida para sumar el tiempo de la semana actual.
+     * @param uidHijo El UID del hijo.
+     * @return Un mapa donde la clave es la semana del año (Int) y el valor es el tiempo total en milisegundos (Long).
+     */
+    suspend fun obtenerTiempoPantallaSemanal(uidHijo: String): Map<Int, Long> {
+        return try {
+            val calendar = Calendar.getInstance()
+            // Obtener la fecha de inicio de la semana (lunes)
+            calendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+            val inicioSemana = calendar.timeInMillis
+            // Obtener la fecha de fin de la semana (domingo a las 23:59:59)
+            calendar.add(Calendar.DAY_OF_YEAR, 7)
+            val finSemana = calendar.timeInMillis
+
+            // Consulta que filtra los datos de la semana actual
+            val snapshot = db.collection("hijos").document(uidHijo)
+                .collection("uso_apps")
+                .whereGreaterThanOrEqualTo("fechaUso", inicioSemana)
+                .whereLessThan("fechaUso", finSemana)
+                .get()
+                .await()
+
+            // Agrupa todos los usos por semana del año y suma el tiempo.
+            val resumen = snapshot.documents.mapNotNull { it.toObject(AppUso::class.java) }
+                .groupBy {
+                    val cal = Calendar.getInstance().apply { timeInMillis = it.fechaUso }
+                    cal.get(Calendar.WEEK_OF_YEAR)
+                }
+                .mapValues { (_, usosDeLaSemana) ->
+                    usosDeLaSemana.sumOf { it.tiempoUso }
+                }
+            resumen
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error al obtener resumen de tiempo semanal: ${e.message}", e)
+            emptyMap()
+        }
     }
 }

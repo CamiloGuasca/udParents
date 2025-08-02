@@ -22,8 +22,9 @@ import com.example.udparents.vista.pantallas.PantallaProgramarRestricciones
 import com.example.udparents.vista.pantallas.PantallaRegistro
 import com.example.udparents.vista.pantallas.PantallaRecuperarContrasena
 import com.example.udparents.vista.pantallas.PantallaReporteApps
-import com.example.udparents.vista.pantallas.PantallaSeleccionHijo // Usamos la nueva pantalla genérica
+import com.example.udparents.vista.pantallas.PantallaSeleccionHijo
 import com.example.udparents.vista.pantallas.PantallaVinculacionHijo
+import com.example.udparents.vista.pantallas.PantallaResumenTiempoPantalla // Importa la nueva pantalla
 
 /**
  * Rutas nombradas para facilitar la navegación.
@@ -42,6 +43,7 @@ object Rutas {
     const val PROGRAMAR_RESTRICCIONES = "programar_restricciones"
     const val DETALLES_RESTRICCIONES = "programar_restricciones_detalles/{uidHijo}/{nombreHijo}"
     const val DETALLES_CONTROL = "control_apps/{uidHijo}"
+    const val RESUMEN_TIEMPO = "resumen_tiempo" // NUEVO: Ruta para la pantalla de resumen de tiempo
 }
 
 /**
@@ -134,6 +136,14 @@ fun NavegacionApp() {
                     )
                     // Navegamos a la pantalla de selección con un título diferente
                     navController.navigate(Rutas.PROGRAMAR_RESTRICCIONES)
+                },
+                // NUEVO: Conecta el callback para la nueva pantalla
+                onIrAResumenTiempoPantalla = { hijos ->
+                    navController.currentBackStackEntry?.savedStateHandle?.set(
+                        "hijosVinculados",
+                        hijos
+                    )
+                    navController.navigate(Rutas.RESUMEN_TIEMPO)
                 }
             )
         }
@@ -222,6 +232,17 @@ fun NavegacionApp() {
                 onVolver = {
                     navController.popBackStack()
                 }
+            )
+        }
+        // NUEVO: Composable para la pantalla de Resumen de Tiempo de Pantalla
+        composable(Rutas.RESUMEN_TIEMPO) {
+            val hijos = navController.previousBackStackEntry
+                ?.savedStateHandle
+                ?.get<List<Pair<String, String>>>("hijosVinculados")
+                ?: emptyList()
+
+            PantallaResumenTiempoPantalla(
+                onVolverAlMenuPadre = { navController.popBackStack() }
             )
         }
         // Ruta de destino para la pantalla de detalles de Control de Apps
