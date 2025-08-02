@@ -9,7 +9,9 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.udparents.R
+import com.example.udparents.modelo.BloqueoRegistro
 import com.example.udparents.repositorio.RepositorioApps
+import com.example.udparents.repositorio.RepositorioBloqueos
 import com.example.udparents.utilidades.RegistroUsoApps
 import com.example.udparents.vista.pantallas.PantallaBloqueoComposeActivity
 import com.google.firebase.auth.FirebaseAuth
@@ -155,11 +157,27 @@ class RegistroUsoService : Service() {
             }
         }
 
-
         if (debeBloquear) {
             if (paqueteActual != paqueteBloqueadoActual) {
                 paqueteBloqueadoActual = paqueteActual
                 Log.d("RegistroUsoService", "🔒 App bloqueada detectada: $nombreAppActual ($paqueteActual) - Motivo: $motivoBloqueo")
+
+                // ✅ LÓGICA AGREGADA: Registrar el intento de acceso bloqueado
+                val repoBloqueos = RepositorioBloqueos()
+                val bloqueoRegistro = BloqueoRegistro(
+                    uidHijo = uidHijo,
+                    nombrePaquete = paqueteActual, // CORREGIDO para que coincida con la clase BloqueoRegistro
+                    nombreApp = nombreAppActual,
+                    razon = motivoBloqueo
+                )
+                scope.launch {
+                    try {
+                        repoBloqueos.registrarBloqueo(uidHijo, bloqueoRegistro)
+                        Log.d("RegistroUsoService", "✅ Intento de bloqueo registrado en Firebase.")
+                    } catch (e: Exception) {
+                        Log.e("RegistroUsoService", "❌ Error al registrar bloqueo: ${e.message}", e)
+                    }
+                }
 
                 val intent = Intent(context, PantallaBloqueoComposeActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)

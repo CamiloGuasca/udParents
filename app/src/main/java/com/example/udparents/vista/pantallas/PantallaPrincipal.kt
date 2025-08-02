@@ -24,7 +24,8 @@ fun PantallaPrincipal(
     onIrAControlApps: (List<Pair<String, String>>) -> Unit,
     onIrAProgramarRestricciones: (List<Pair<String, String>>) -> Unit,
     onIrAResumenTiempoPantalla: (List<Pair<String, String>>) -> Unit,
-    onIrAInformeAppsMasUsadas: (List<Pair<String, String>>) -> Unit // Nuevo parámetro para la nueva pantalla
+    onIrAInformeAppsMasUsadas: (List<Pair<String, String>>) -> Unit,
+    onIrARegistroBloqueos: (List<Pair<String, String>>) -> Unit // Se pasa la lista de hijos
 ) {
     val vistaModelo: VistaModeloApps = viewModel()
     val hijosVinculados by vistaModelo.hijosVinculados.collectAsState()
@@ -88,7 +89,6 @@ fun PantallaPrincipal(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Botón para la nueva pantalla de Apps Más Usadas
             Button(
                 onClick = { onIrAInformeAppsMasUsadas(hijosVinculados) },
                 enabled = hijosVinculados.isNotEmpty(),
@@ -97,6 +97,18 @@ fun PantallaPrincipal(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Apps Más Usadas", color = Color.White)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = { onIrARegistroBloqueos(hijosVinculados) }, // Pasa la lista de hijos
+                enabled = hijosVinculados.isNotEmpty(),
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6699CC)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Registro de Bloqueos", color = Color.White)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -130,7 +142,6 @@ fun PantallaPrincipal(
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF336699)),
                 modifier = Modifier.fillMaxWidth()
             ) {
-
                 Text("Resumen de Tiempo de Pantalla", color = Color.White)
             }
 

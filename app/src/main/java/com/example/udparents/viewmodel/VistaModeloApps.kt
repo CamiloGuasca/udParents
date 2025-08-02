@@ -5,7 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.udparents.modelo.AppUso
 import com.example.udparents.modelo.RestriccionHorario
+import com.example.udparents.modelo.BloqueoRegistro
 import com.example.udparents.repositorio.RepositorioApps
+import com.example.udparents.repositorio.RepositorioBloqueos
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -14,7 +16,7 @@ import java.util.Date
 class VistaModeloApps : ViewModel() {
 
     private val repositorio = RepositorioApps()
-
+    private val repositorioBloqueos = RepositorioBloqueos()
     private val _listaUsos = MutableStateFlow<List<AppUso>>(emptyList())
     val listaUsos: StateFlow<List<AppUso>> = _listaUsos
     private val _hijosVinculados = MutableStateFlow<List<Pair<String, String>>>(emptyList())
@@ -29,10 +31,10 @@ class VistaModeloApps : ViewModel() {
     val tiempoPantallaDiario: StateFlow<Map<String, Long>> = _tiempoPantallaDiario
     private val _tiempoPantallaSemanal = MutableStateFlow<Map<Int, Long>>(emptyMap())
     val tiempoPantallaSemanal: StateFlow<Map<Int, Long>> = _tiempoPantallaSemanal
-
-    // NUEVO: Estado para el informe de aplicaciones más usadas
     private val _appsMasUsadas = MutableStateFlow<Map<String, Long>>(emptyMap())
     val appsMasUsadas: StateFlow<Map<String, Long>> = _appsMasUsadas
+    private val _registroBloqueos = MutableStateFlow<List<BloqueoRegistro>>(emptyList())
+    val registroBloqueos: StateFlow<List<BloqueoRegistro>> = _registroBloqueos
 
 
     fun cargarRestriccionesHorario(uidHijo: String) {
@@ -192,6 +194,17 @@ class VistaModeloApps : ViewModel() {
                 Log.d("VistaModeloApps", "Informe de apps más usadas cargado: ${appsUsadas.size} apps.")
             } catch (e: Exception) {
                 Log.e("VistaModeloApps", "Error al cargar apps más usadas: ${e.message}", e)
+            }
+        }
+    }
+    fun cargarRegistroBloqueos(uidHijo: String) {
+        viewModelScope.launch {
+            try {
+                val bloqueos = repositorioBloqueos.obtenerRegistrosDeBloqueo(uidHijo)
+                _registroBloqueos.value = bloqueos
+                Log.d("VistaModeloApps", "Registros de bloqueo cargados: ${bloqueos.size} eventos.")
+            } catch (e: Exception) {
+                Log.e("VistaModeloApps", "Error al cargar registros de bloqueo: ${e.message}", e)
             }
         }
     }

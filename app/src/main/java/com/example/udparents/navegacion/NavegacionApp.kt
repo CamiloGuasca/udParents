@@ -1,31 +1,14 @@
 package com.example.udparents.navegacion
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.listSaver
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import com.example.udparents.viewmodel.VistaModeloUsuario
-import com.example.udparents.vista.pantallas.PantallaBienvenida
-import com.example.udparents.vista.pantallas.PantallaCodigoPadre
-import com.example.udparents.vista.pantallas.PantallaControlApps
-import com.example.udparents.vista.pantallas.PantallaDispositivosVinculados
-import com.example.udparents.vista.pantallas.PantallaInicioSesion
-import com.example.udparents.vista.pantallas.PantallaPrincipal
-import com.example.udparents.vista.pantallas.PantallaProgramarRestricciones
-import com.example.udparents.vista.pantallas.PantallaRegistro
-import com.example.udparents.vista.pantallas.PantallaRecuperarContrasena
-import com.example.udparents.vista.pantallas.PantallaReporteApps
-import com.example.udparents.vista.pantallas.PantallaSeleccionHijo
-import com.example.udparents.vista.pantallas.PantallaVinculacionHijo
-import com.example.udparents.vista.pantallas.PantallaResumenTiempoPantalla
-import com.example.udparents.vista.pantallas.PantallaInformeAppsMasUsadas // Importa la nueva pantalla
+import com.example.udparents.vista.pantallas.*
 
 /**
  * Rutas nombradas para facilitar la navegación.
@@ -45,7 +28,8 @@ object Rutas {
     const val DETALLES_RESTRICCIONES = "programar_restricciones_detalles/{uidHijo}/{nombreHijo}"
     const val DETALLES_CONTROL = "control_apps/{uidHijo}"
     const val RESUMEN_TIEMPO = "resumen_tiempo"
-    const val INFORME_APPS_MAS_USADAS = "informe_apps_mas_usadas" // Nueva ruta para el informe de apps más usadas
+    const val INFORME_APPS_MAS_USADAS = "informe_apps_mas_usadas"
+    const val REGISTRO_BLOQUEOS = "registro_bloqueos" // Ruta para la nueva pantalla
 }
 
 /**
@@ -75,10 +59,8 @@ fun NavegacionApp() {
             )
         }
         composable(Rutas.REGISTRO) {
-            val viewModel = remember { VistaModeloUsuario() }
-
             PantallaRegistro(
-                viewModel = viewModel,
+                viewModel = viewModel(),
                 onRegistroExitoso = {
                     navController.navigate(Rutas.INICIO_SESION) {
                         popUpTo(Rutas.REGISTRO) { inclusive = true }
@@ -90,10 +72,8 @@ fun NavegacionApp() {
             )
         }
         composable(Rutas.RECUPERAR) {
-            val viewModel = remember { VistaModeloUsuario() }
-
             PantallaRecuperarContrasena(
-                viewModel = viewModel,
+                viewModel = viewModel(),
                 onRecuperacionEnviada = {
                     navController.popBackStack(Rutas.INICIO_SESION, false)
                 },
@@ -117,42 +97,28 @@ fun NavegacionApp() {
                     navController.navigate(Rutas.DISPOSITIVOS_VINCULADOS)
                 },
                 onIrAReporteApps = { hijos ->
-                    navController.currentBackStackEntry?.savedStateHandle?.set(
-                        "hijosVinculados",
-                        hijos
-                    )
+                    navController.currentBackStackEntry?.savedStateHandle?.set("hijosVinculados", hijos)
                     navController.navigate(Rutas.REPORTE_APPS)
                 },
                 onIrAControlApps = { hijos ->
-                    navController.currentBackStackEntry?.savedStateHandle?.set(
-                        "hijosVinculados",
-                        hijos
-                    )
-                    // Navegamos a la pantalla de selección con un título
+                    navController.currentBackStackEntry?.savedStateHandle?.set("hijosVinculados", hijos)
                     navController.navigate(Rutas.CONTROL_APPS)
                 },
                 onIrAProgramarRestricciones = { hijos ->
-                    navController.currentBackStackEntry?.savedStateHandle?.set(
-                        "hijosVinculados",
-                        hijos
-                    )
-                    // Navegamos a la pantalla de selección con un título diferente
+                    navController.currentBackStackEntry?.savedStateHandle?.set("hijosVinculados", hijos)
                     navController.navigate(Rutas.PROGRAMAR_RESTRICCIONES)
                 },
                 onIrAResumenTiempoPantalla = { hijos ->
-                    navController.currentBackStackEntry?.savedStateHandle?.set(
-                        "hijosVinculados",
-                        hijos
-                    )
+                    navController.currentBackStackEntry?.savedStateHandle?.set("hijosVinculados", hijos)
                     navController.navigate(Rutas.RESUMEN_TIEMPO)
                 },
-                // Nuevo: Conecta el callback para la pantalla de Apps Más Usadas
                 onIrAInformeAppsMasUsadas = { hijos ->
-                    navController.currentBackStackEntry?.savedStateHandle?.set(
-                        "hijosVinculados",
-                        hijos
-                    )
+                    navController.currentBackStackEntry?.savedStateHandle?.set("hijosVinculados", hijos)
                     navController.navigate(Rutas.INFORME_APPS_MAS_USADAS)
+                },
+                onIrARegistroBloqueos = {
+                    // Navegación corregida para no pasar datos.
+                    navController.navigate(Rutas.REGISTRO_BLOQUEOS)
                 }
             )
         }
@@ -207,7 +173,6 @@ fun NavegacionApp() {
                 }
             )
         }
-        // Ruta para la pantalla de selección de hijo para Control de Apps
         composable(Rutas.CONTROL_APPS) {
             val hijos = navController.previousBackStackEntry
                 ?.savedStateHandle
@@ -225,7 +190,6 @@ fun NavegacionApp() {
                 }
             )
         }
-        // Ruta para la pantalla de selección de hijo para Programar Restricciones
         composable(Rutas.PROGRAMAR_RESTRICCIONES) {
             val hijos = navController.previousBackStackEntry
                 ?.savedStateHandle
@@ -243,19 +207,22 @@ fun NavegacionApp() {
                 }
             )
         }
-        // Composable para la pantalla de Resumen de Tiempo de Pantalla
         composable(Rutas.RESUMEN_TIEMPO) {
             PantallaResumenTiempoPantalla(
                 onVolverAlMenuPadre = { navController.popBackStack() }
             )
         }
-        // Composable para la nueva pantalla de Apps Más Usadas
         composable(Rutas.INFORME_APPS_MAS_USADAS) {
             PantallaInformeAppsMasUsadas(
                 onVolverAlMenuPadre = { navController.popBackStack() }
             )
         }
-        // Ruta de destino para la pantalla de detalles de Control de Apps
+        // ¡NUEVO! Composable para la pantalla de Registro de Bloqueos
+        composable(Rutas.REGISTRO_BLOQUEOS) {
+            PantallaRegistroBloqueos(
+                onVolverAlMenuPadre = { navController.popBackStack() }
+            )
+        }
         composable(
             route = Rutas.DETALLES_CONTROL,
             arguments = listOf(navArgument("uidHijo") { type = NavType.StringType })
@@ -263,7 +230,6 @@ fun NavegacionApp() {
             val uidHijo = backStackEntry.arguments?.getString("uidHijo") ?: ""
             PantallaControlApps(uidHijo = uidHijo)
         }
-        // Ruta de destino para la pantalla de detalles de Programar Restricciones
         composable(
             route = Rutas.DETALLES_RESTRICCIONES,
             arguments = listOf(
