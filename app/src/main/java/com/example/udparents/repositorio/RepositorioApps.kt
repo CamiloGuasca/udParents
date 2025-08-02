@@ -322,4 +322,30 @@ class RepositorioApps {
             emptyMap()
         }
     }
+    suspend fun obtenerAppsMasUsadas(uidHijo: String, desde: Long, hasta: Long): Map<String, Long> {
+        return try {
+            // Realiza la consulta a Firestore filtrando los documentos por el rango de fechas.
+            val snapshot = db.collection("hijos").document(uidHijo)
+                .collection("uso_apps")
+                .whereGreaterThanOrEqualTo("fechaUso", desde)
+                .whereLessThanOrEqualTo("fechaUso", hasta)
+                .get()
+                .await()
+
+            // Mapea los documentos a objetos AppUso.
+            val usos = snapshot.documents.mapNotNull { it.toObject(AppUso::class.java) }
+
+            // Agrupa los objetos por el nombre de la aplicación y suma el tiempo de uso para cada grupo.
+            val resumenPorApp = usos.groupBy { it.nombreApp }
+                .mapValues { (_, usosDeLaApp) ->
+                    usosDeLaApp.sumOf { it.tiempoUso }
+                }
+
+            Log.d(TAG, "✅ Informe de apps más usadas obtenido para el rango de fechas. ${resumenPorApp.size} apps encontradas.")
+            resumenPorApp
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error al obtener informe de apps más usadas: ${e.message}", e)
+            emptyMap()
+        }
+    }
 }

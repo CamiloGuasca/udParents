@@ -24,7 +24,8 @@ import com.example.udparents.vista.pantallas.PantallaRecuperarContrasena
 import com.example.udparents.vista.pantallas.PantallaReporteApps
 import com.example.udparents.vista.pantallas.PantallaSeleccionHijo
 import com.example.udparents.vista.pantallas.PantallaVinculacionHijo
-import com.example.udparents.vista.pantallas.PantallaResumenTiempoPantalla // Importa la nueva pantalla
+import com.example.udparents.vista.pantallas.PantallaResumenTiempoPantalla
+import com.example.udparents.vista.pantallas.PantallaInformeAppsMasUsadas // Importa la nueva pantalla
 
 /**
  * Rutas nombradas para facilitar la navegación.
@@ -43,7 +44,8 @@ object Rutas {
     const val PROGRAMAR_RESTRICCIONES = "programar_restricciones"
     const val DETALLES_RESTRICCIONES = "programar_restricciones_detalles/{uidHijo}/{nombreHijo}"
     const val DETALLES_CONTROL = "control_apps/{uidHijo}"
-    const val RESUMEN_TIEMPO = "resumen_tiempo" // NUEVO: Ruta para la pantalla de resumen de tiempo
+    const val RESUMEN_TIEMPO = "resumen_tiempo"
+    const val INFORME_APPS_MAS_USADAS = "informe_apps_mas_usadas" // Nueva ruta para el informe de apps más usadas
 }
 
 /**
@@ -137,13 +139,20 @@ fun NavegacionApp() {
                     // Navegamos a la pantalla de selección con un título diferente
                     navController.navigate(Rutas.PROGRAMAR_RESTRICCIONES)
                 },
-                // NUEVO: Conecta el callback para la nueva pantalla
                 onIrAResumenTiempoPantalla = { hijos ->
                     navController.currentBackStackEntry?.savedStateHandle?.set(
                         "hijosVinculados",
                         hijos
                     )
                     navController.navigate(Rutas.RESUMEN_TIEMPO)
+                },
+                // Nuevo: Conecta el callback para la pantalla de Apps Más Usadas
+                onIrAInformeAppsMasUsadas = { hijos ->
+                    navController.currentBackStackEntry?.savedStateHandle?.set(
+                        "hijosVinculados",
+                        hijos
+                    )
+                    navController.navigate(Rutas.INFORME_APPS_MAS_USADAS)
                 }
             )
         }
@@ -234,14 +243,15 @@ fun NavegacionApp() {
                 }
             )
         }
-        // NUEVO: Composable para la pantalla de Resumen de Tiempo de Pantalla
+        // Composable para la pantalla de Resumen de Tiempo de Pantalla
         composable(Rutas.RESUMEN_TIEMPO) {
-            val hijos = navController.previousBackStackEntry
-                ?.savedStateHandle
-                ?.get<List<Pair<String, String>>>("hijosVinculados")
-                ?: emptyList()
-
             PantallaResumenTiempoPantalla(
+                onVolverAlMenuPadre = { navController.popBackStack() }
+            )
+        }
+        // Composable para la nueva pantalla de Apps Más Usadas
+        composable(Rutas.INFORME_APPS_MAS_USADAS) {
+            PantallaInformeAppsMasUsadas(
                 onVolverAlMenuPadre = { navController.popBackStack() }
             )
         }

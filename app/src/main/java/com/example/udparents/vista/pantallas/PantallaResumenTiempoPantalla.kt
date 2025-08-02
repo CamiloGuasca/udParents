@@ -83,7 +83,7 @@ fun PantallaResumenTiempoPantalla(
     val vistas = listOf("Diaria", "Semanal")
 
     // Paleta de colores
-    val primaryDark = Color(0xFF1A237E)
+    val primaryDark = Color(0xFF000033)
     val primaryLight = Color(0xFF3F51B5)
     val accentColor = Color(0xFFCDDC39)
     val onPrimaryColor = Color.White

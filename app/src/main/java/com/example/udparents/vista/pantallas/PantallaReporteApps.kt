@@ -115,7 +115,7 @@ fun PantallaReporteApps(
     }
 
     // --- NUEVA PALETA DE COLORES PARA MEJOR CONTRASTE ---
-    val primaryDark = Color(0xFF1A237E) // Azul oscuro muy profundo (fondo principal)
+    val primaryDark = Color(0xFF000033) // Azul oscuro muy profundo (fondo principal)
     val primaryLight = Color(0xFF3F51B5) // Azul primario para TopAppBar, botón principal
     val accentColor = Color(0xFFCDDC39) // Verde lima vibrante para botones de acción y texto destacado
     val onPrimaryColor = Color.White // Texto sobre azules

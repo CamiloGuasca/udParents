@@ -30,6 +30,11 @@ class VistaModeloApps : ViewModel() {
     private val _tiempoPantallaSemanal = MutableStateFlow<Map<Int, Long>>(emptyMap())
     val tiempoPantallaSemanal: StateFlow<Map<Int, Long>> = _tiempoPantallaSemanal
 
+    // NUEVO: Estado para el informe de aplicaciones más usadas
+    private val _appsMasUsadas = MutableStateFlow<Map<String, Long>>(emptyMap())
+    val appsMasUsadas: StateFlow<Map<String, Long>> = _appsMasUsadas
+
+
     fun cargarRestriccionesHorario(uidHijo: String) {
         viewModelScope.launch {
             try {
@@ -173,5 +178,21 @@ class VistaModeloApps : ViewModel() {
         }
     }
 
-
+    /**
+     * NUEVO: Carga el informe de aplicaciones más usadas para un hijo y un rango de fechas.
+     * @param uidHijo El UID del hijo.
+     * @param desde El timestamp de inicio del rango.
+     * @param hasta El timestamp de fin del rango.
+     */
+    fun cargarAppsMasUsadas(uidHijo: String, desde: Long, hasta: Long) {
+        viewModelScope.launch {
+            try {
+                val appsUsadas = repositorio.obtenerAppsMasUsadas(uidHijo, desde, hasta)
+                _appsMasUsadas.value = appsUsadas
+                Log.d("VistaModeloApps", "Informe de apps más usadas cargado: ${appsUsadas.size} apps.")
+            } catch (e: Exception) {
+                Log.e("VistaModeloApps", "Error al cargar apps más usadas: ${e.message}", e)
+            }
+        }
+    }
 }

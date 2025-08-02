@@ -19,11 +19,12 @@ import com.google.firebase.auth.FirebaseAuth
 fun PantallaPrincipal(
     onCerrarSesion: () -> Unit,
     onIrAVinculacionPadre: () -> Unit,
+    onIrADispositivosVinculados: () -> Unit,
     onIrAReporteApps: (List<Pair<String, String>>) -> Unit,
     onIrAControlApps: (List<Pair<String, String>>) -> Unit,
-    onIrADispositivosVinculados: () -> Unit,
     onIrAProgramarRestricciones: (List<Pair<String, String>>) -> Unit,
-    onIrAResumenTiempoPantalla: (List<Pair<String, String>>) -> Unit
+    onIrAResumenTiempoPantalla: (List<Pair<String, String>>) -> Unit,
+    onIrAInformeAppsMasUsadas: (List<Pair<String, String>>) -> Unit // Nuevo parámetro para la nueva pantalla
 ) {
     val vistaModelo: VistaModeloApps = viewModel()
     val hijosVinculados by vistaModelo.hijosVinculados.collectAsState()
@@ -83,6 +84,19 @@ fun PantallaPrincipal(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Ver historial de uso", color = Color.White)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Botón para la nueva pantalla de Apps Más Usadas
+            Button(
+                onClick = { onIrAInformeAppsMasUsadas(hijosVinculados) },
+                enabled = hijosVinculados.isNotEmpty(),
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6699CC)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Apps Más Usadas", color = Color.White)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
