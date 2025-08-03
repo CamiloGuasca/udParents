@@ -1,12 +1,16 @@
 package com.example.udparents.navegacion
 
+import android.content.Context
+import android.content.ContextWrapper
+import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.navigation.NavType
 import com.example.udparents.viewmodel.VistaModeloUsuario
 import com.example.udparents.vista.pantallas.*
 
@@ -29,7 +33,15 @@ object Rutas {
     const val DETALLES_CONTROL = "control_apps/{uidHijo}"
     const val RESUMEN_TIEMPO = "resumen_tiempo"
     const val INFORME_APPS_MAS_USADAS = "informe_apps_mas_usadas"
-    const val REGISTRO_BLOQUEOS = "registro_bloqueos" // Ruta para la nueva pantalla
+    const val REGISTRO_BLOQUEOS = "registro_bloqueos"
+    // 💡 La ruta VISTA_PDF se ha eliminado porque ya no se necesita la pantalla
+}
+
+// Función de extensión para encontrar la actividad de forma segura
+fun Context.findActivity(): ComponentActivity? = when (this) {
+    is ComponentActivity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 /**
@@ -38,6 +50,11 @@ object Rutas {
 @Composable
 fun NavegacionApp() {
     val navController = rememberNavController()
+    val activity = LocalContext.current.findActivity()
+
+    if (activity == null) {
+        return
+    }
 
     NavHost(
         navController = navController,
@@ -117,7 +134,6 @@ fun NavegacionApp() {
                     navController.navigate(Rutas.INFORME_APPS_MAS_USADAS)
                 },
                 onIrARegistroBloqueos = {
-                    // Navegación corregida para no pasar datos.
                     navController.navigate(Rutas.REGISTRO_BLOQUEOS)
                 }
             )
@@ -217,12 +233,15 @@ fun NavegacionApp() {
                 onVolverAlMenuPadre = { navController.popBackStack() }
             )
         }
-        // ¡NUEVO! Composable para la pantalla de Registro de Bloqueos
+        // 💡 Composable corregido: ya no se pasa el navController
         composable(Rutas.REGISTRO_BLOQUEOS) {
             PantallaRegistroBloqueos(
-                onVolverAlMenuPadre = { navController.popBackStack() }
+                onVolverAlMenuPadre = { navController.popBackStack() },
+                activity = activity,
+                navController = navController
             )
         }
+        // 💡 El composable para Rutas.VISTA_PDF se ha eliminado
         composable(
             route = Rutas.DETALLES_CONTROL,
             arguments = listOf(navArgument("uidHijo") { type = NavType.StringType })

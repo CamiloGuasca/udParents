@@ -513,7 +513,7 @@ fun AddEditRestriccionDialog(
                 border = ButtonDefaults.outlinedButtonBorder.copy(brush = SolidColor(borderColor))
             ) {
                 Text("Cancelar")
-                println("ola")
+
             }
         },
         containerColor = primaryDark

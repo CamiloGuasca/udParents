@@ -1,5 +1,6 @@
 package com.example.udparents.vista.pantallas
 
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,41 +9,41 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import com.example.udparents.modelo.BloqueoRegistro
+import com.example.udparents.utilidades.PdfUtils
 import com.example.udparents.viewmodel.VistaModeloApps
 import com.google.firebase.auth.FirebaseAuth
-import java.text.SimpleDateFormat
-import java.util.*
-
-// =================================================================================================
-// PANTALLA PARA HU-014: Registro de Intentos de Acceso Bloqueados
-// Muestra un registro de los intentos de acceso a apps bloqueadas de forma consolidada.
-// =================================================================================================
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaRegistroBloqueos(
-    onVolverAlMenuPadre: () -> Unit
+    onVolverAlMenuPadre: () -> Unit,
+    activity: ComponentActivity,
+    navController: NavController
 ) {
     val viewModel: VistaModeloApps = viewModel()
     val hijosVinculados by viewModel.hijosVinculados.collectAsState()
     val usuario = FirebaseAuth.getInstance().currentUser
     val idPadre = usuario?.uid ?: ""
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
-    var hijoSeleccionado by remember {
-        mutableStateOf<Pair<String, String>?>(null)
-    }
-
+    var hijoSeleccionado by remember { mutableStateOf<Pair<String, String>?>(null) }
     val registroBloqueos by viewModel.registroBloqueos.collectAsState()
 
     LaunchedEffect(Unit) {
@@ -76,6 +77,27 @@ fun PantallaRegistroBloqueos(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = onPrimaryColor)
                     }
                 },
+                actions = {
+                    if (registroBloqueos.isNotEmpty()) {
+                        IconButton(onClick = {
+                            // Acción del botón PDF
+                            coroutineScope.launch {
+                                val nombreArchivo = "bloqueos_${hijoSeleccionado?.second ?: "hijo"}"
+                                // Generamos y abrimos el PDF directamente, no usamos una variable de estado
+                                PdfUtils.generarPdfDesdeComposable(
+                                    context = context,
+                                    activity = activity,
+                                    fileName = nombreArchivo,
+                                    // Pasamos el Composable que queremos renderizar en el PDF
+                                ) {
+                                    ReporteDeBloqueosPDF(registroBloqueos)
+                                }
+                            }
+                        }) {
+                            Icon(Icons.Default.PictureAsPdf, contentDescription = "Ver PDF", tint = onPrimaryColor)
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = primaryLight,
                     titleContentColor = onPrimaryColor
@@ -95,9 +117,7 @@ fun PantallaRegistroBloqueos(
                 HijoSelectorRegistroBloqueos(
                     hijos = hijosVinculados,
                     hijoSeleccionado = hijoSeleccionado,
-                    onHijoSeleccionado = {
-                        hijoSeleccionado = it
-                    },
+                    onHijoSeleccionado = { hijoSeleccionado = it },
                     surfaceColor = surfaceColor,
                     onSurfaceColor = onSurfaceColor
                 )
@@ -124,6 +144,35 @@ fun PantallaRegistroBloqueos(
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.fillMaxWidth()
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReporteDeBloqueosPDF(bloqueos: List<BloqueoRegistro>) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .background(Color.White) // Asegurar que el fondo del PDF sea blanco
+    ) {
+        Text(
+            text = "Informe de Bloqueos de Aplicaciones",
+            style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.Black)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        bloqueos.forEach { bloqueo ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            ) {
+                Text(text = "App: ${bloqueo.nombreApp}", style = TextStyle(fontWeight = FontWeight.Bold, color = Color.Black))
+                Text(text = "Razón: ${bloqueo.razon}", color = Color.Black)
+                Text(text = "Intentos: ${bloqueo.contadorIntentos}", color = Color.Black)
+                Text(text = "Fecha: ${bloqueo.fecha}", color = Color.Black)
+                Text(text = "Horas: ${bloqueo.intentos.joinToString(", ")}", color = Color.Black)
             }
         }
     }
@@ -221,7 +270,6 @@ private fun BloqueoItem(
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-
                 Text(
                     text = "Intentos: ${bloqueo.contadorIntentos}",
                     color = contentColor.copy(alpha = 0.8f),
@@ -229,7 +277,6 @@ private fun BloqueoItem(
                     fontWeight = FontWeight.Medium
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-
                 bloqueo.intentos.forEach { intento ->
                     Text(
                         text = "• $intento",
@@ -237,7 +284,6 @@ private fun BloqueoItem(
                         fontSize = 12.sp
                     )
                 }
-
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "Razón: ${bloqueo.razon}",

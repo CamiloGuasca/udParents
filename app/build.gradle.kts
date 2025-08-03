@@ -55,7 +55,7 @@ dependencies {
     implementation("androidx.compose.foundation:foundation-layout:1.6.0")
     implementation("androidx.compose.material3:material3:1.2.1") // 👈 versión explícita si la anterior falla
     implementation("androidx.compose.material:material-icons-extended:1.6.1")
-// Asegúrate de tener esta también (ya la tienes probablemente en libs.androidx.material3, pero mejor explícita si tienes errores)
+    implementation("androidx.compose.material:material:1.6.1")
 
 
     // Dependencias de Navegación (Compose)
