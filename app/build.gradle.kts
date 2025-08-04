@@ -15,7 +15,6 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -28,56 +27,66 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     kotlinOptions {
         jvmTarget = "11"
     }
+
     buildFeatures {
         compose = true
     }
 }
 
 dependencies {
+    // ---------------------------
+    // ✅ Firebase (con BOM)
+    // ---------------------------
+    implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-functions-ktx")
+    implementation("com.google.firebase:firebase-messaging-ktx")
 
-    // Dependencias de AndroidX y Compose
+    // ---------------------------
+    // ✅ Jetpack Compose
+    // ---------------------------
+    implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
-    //implementation(libs.androidx.material3)
-    // Necesario para usar FlowRow (ExperimentalLayoutApi)
     implementation("androidx.compose.foundation:foundation-layout:1.6.0")
-    implementation("androidx.compose.material3:material3:1.2.1") // 👈 versión explícita si la anterior falla
-    implementation("androidx.compose.material:material-icons-extended:1.6.1")
     implementation("androidx.compose.material:material:1.6.1")
+    implementation("androidx.compose.material:material-icons-extended:1.6.1")
+    implementation("androidx.compose.material3:material3:1.2.1")
 
-
-    // Dependencias de Navegación (Compose)
+    // ---------------------------
+    // ✅ Navegación y Lifecycle
+    // ---------------------------
     implementation(libs.androidx.navigation.runtime.android)
     implementation("androidx.navigation:navigation-compose:2.9.1")
-
-    // Dependencias de Lifecycle (Compose)
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.2")
-    implementation("androidx.compose.material:material-icons-extended:1.6.1")
 
-    // Firebase BOM: Gestiona las versiones de todas las librerías de Firebase
-    // ¡Esta línea es CRÍTICA y debe estar presente UNA SOLA VEZ!
-    implementation(platform("com.google.firebase:firebase-bom:33.1.0")) // Asegúrate de que esta sea la versión más reciente
+    // ---------------------------
+    // ✅ HTTP / Red
+    // ---------------------------
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
-    // Declaraciones de librerías de Firebase (SIN versión, ya que la BOM las maneja)
-    implementation(libs.firebase.auth.ktx)
-    implementation(libs.firebase.firestore.ktx)
-
-    // Dependencia de Google Mobile Ads SDK
+    // ---------------------------
+    // ✅ Google Ads
+    // ---------------------------
     implementation(libs.ads.mobile.sdk)
 
-    // Dependencias de testing
+    // ---------------------------
+    // ✅ Testing
+    // ---------------------------
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

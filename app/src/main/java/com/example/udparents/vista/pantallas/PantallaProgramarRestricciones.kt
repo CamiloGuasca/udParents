@@ -2,56 +2,15 @@ package com.example.udparents.vista.pantallas
 
 import android.app.TimePickerDialog
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -62,11 +21,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.udparents.modelo.RestriccionHorario
 import com.example.udparents.viewmodel.VistaModeloApps
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 import java.util.UUID
 
-// Función de ayuda para formatear los milisegundos del día a una cadena de tiempo (HH:mm)
+/**
+ * Función de ayuda para formatear los milisegundos del día a una cadena de tiempo (HH:mm).
+ */
 private fun formatMillisOfDay(millis: Long): String {
     val totalSeconds = millis / 1000
     val hours = (totalSeconds / 3600) % 24
@@ -74,6 +34,10 @@ private fun formatMillisOfDay(millis: Long): String {
     return String.format(Locale.getDefault(), "%02d:%02d", hours, minutes)
 }
 
+/**
+ * Composable principal para la pantalla de programación de restricciones.
+ * Permite a los padres configurar y gestionar restricciones de horario para sus hijos.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun PantallaProgramarRestricciones(
@@ -99,7 +63,7 @@ fun PantallaProgramarRestricciones(
     var editingRestriction by remember { mutableStateOf<RestriccionHorario?>(null) }
 
 
-    // --- PALETA DE COLORES (Coherente con las otras pantallas) ---
+    // Paleta de colores consistente con el diseño de la aplicación
     val primaryDark = Color(0xFF1A237E)
     val primaryLight = Color(0xFF3F51B5)
     val accentColor = Color(0xFFCDDC39)
@@ -112,7 +76,6 @@ fun PantallaProgramarRestricciones(
         topBar = {
             TopAppBar(
                 title = {
-                    // Título fijo con el nombre del hijo, no un dropdown
                     Text(
                         "Restricciones para $nombreHijo",
                         color = onPrimaryColor
@@ -147,16 +110,22 @@ fun PantallaProgramarRestricciones(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp) // Pading mejorado
         ) {
             if (restricciones.isEmpty()) {
-                Text(
-                    "No hay restricciones de horario configuradas para $nombreHijo. Pulsa '+' para añadir una.",
-                    color = onSurfaceColor,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No hay restricciones de horario configuradas para $nombreHijo.\nPulsa '+' para añadir una.",
+                        color = onSurfaceColor,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) { // Espacio entre tarjetas
                     items(restricciones) { restriccion ->
                         RestriccionHorarioCard(
                             restriccion = restriccion,
@@ -204,8 +173,9 @@ fun PantallaProgramarRestricciones(
     }
 }
 
-// ... Resto del código de RestriccionHorarioCard y AddEditRestriccionDialog se mantiene igual ...
-
+/**
+ * Composable para mostrar una tarjeta individual de restricción de horario.
+ */
 @Composable
 fun RestriccionHorarioCard(
     restriccion: RestriccionHorario,
@@ -220,6 +190,7 @@ fun RestriccionHorarioCard(
     onSurfaceColor: Color,
     borderColor: Color
 ) {
+    // Mapeo de los enteros de Calendar a nombres de días abreviados
     val daysMap = mapOf(
         Calendar.MONDAY to "Lun", Calendar.TUESDAY to "Mar", Calendar.WEDNESDAY to "Mié",
         Calendar.THURSDAY to "Jue", Calendar.FRIDAY to "Vie", Calendar.SATURDAY to "Sáb", Calendar.SUNDAY to "Dom"
@@ -227,9 +198,10 @@ fun RestriccionHorarioCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp), // Añade un poco de sombra
         colors = CardDefaults.cardColors(containerColor = surfaceColor)
     ) {
-        Column(Modifier.padding(12.dp)) {
+        Column(Modifier.padding(16.dp)) { // Pading interno aumentado
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -251,7 +223,7 @@ fun RestriccionHorarioCard(
                     )
                 )
             }
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(8.dp)) // Espaciado
             Text(
                 text = "App: ${restriccion.appName.ifEmpty { "Todas las Apps" }}",
                 style = MaterialTheme.typography.bodySmall,
@@ -269,7 +241,7 @@ fun RestriccionHorarioCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = onSurfaceColor
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp)) // Espaciado antes de los botones
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
@@ -286,6 +258,9 @@ fun RestriccionHorarioCard(
     }
 }
 
+/**
+ * Composable para el diálogo de añadir o editar una restricción.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AddEditRestriccionDialog(
@@ -323,8 +298,6 @@ fun AddEditRestriccionDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(primaryDark)
-                    .padding(16.dp)
             ) {
                 OutlinedTextField(
                     value = ruleName,
@@ -341,7 +314,7 @@ fun AddEditRestriccionDialog(
                         unfocusedLabelColor = onSurfaceColor
                     )
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
 
                 ExposedDropdownMenuBox(
                     expanded = expandedAppDropdown,
@@ -393,8 +366,10 @@ fun AddEditRestriccionDialog(
                         }
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
 
+                Text("Horario:", style = MaterialTheme.typography.titleSmall, color = onPrimaryColor)
+                Spacer(Modifier.height(4.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceAround
@@ -450,12 +425,13 @@ fun AddEditRestriccionDialog(
                         Text("Fin: ${formatMillisOfDay(endTime)}")
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
 
-                Text("Días de la Semana:", style = MaterialTheme.typography.bodyLarge, color = onPrimaryColor)
+                Text("Días de la Semana:", style = MaterialTheme.typography.titleSmall, color = onPrimaryColor)
+                // Esta es la parte que organiza los días de forma óptima
                 FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp), // Espaciado
+                    horizontalArrangement = Arrangement.spacedBy(8.dp) // Espacio entre chips
                 ) {
                     daysOfWeekOptions.forEach { (dayInt, dayName) ->
                         FilterChip(

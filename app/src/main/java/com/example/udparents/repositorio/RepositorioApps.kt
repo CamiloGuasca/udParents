@@ -252,20 +252,25 @@ class RepositorioApps {
 
     /**
      * Obtiene el tiempo total de pantalla por día para un hijo, solo de la última semana.
-     * Esto es más eficiente que cargar todos los datos históricos.
      * @param uidHijo El UID del hijo.
      * @return Un mapa donde la clave es la fecha (String) y el valor es el tiempo total en milisegundos (Long).
      */
     suspend fun obtenerTiempoPantallaDiario(uidHijo: String): Map<String, Long> {
         return try {
             val calendar = Calendar.getInstance()
-            // Obtener la fecha de inicio de la semana (lunes)
+            // Obtener la fecha de inicio de la semana (lunes a las 00:00:00)
+            calendar.firstDayOfWeek = Calendar.MONDAY
             calendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+            calendar.set(Calendar.HOUR_OF_DAY, 0)
+            calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
             val inicioSemana = calendar.timeInMillis
 
             val snapshot = db.collection("hijos").document(uidHijo)
                 .collection("uso_apps")
-                // Filtra solo los datos de la última semana para mejorar el rendimiento
+                // Filtra solo los documentos de la última semana.
+                // Esta es la parte que causa problemas. Ahora lo corregiremos para que obtenga todos los usos de esa semana y los procese.
                 .whereGreaterThanOrEqualTo("fechaUso", inicioSemana)
                 .get()
                 .await()
@@ -276,6 +281,7 @@ class RepositorioApps {
                 .mapValues { (_, usosDelDia) ->
                     usosDelDia.sumOf { it.tiempoUso }
                 }
+            Log.d(TAG, "✅ Resumen diario cargado: $resumen")
             resumen
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error al obtener resumen de tiempo diario: ${e.message}", e)
@@ -285,25 +291,26 @@ class RepositorioApps {
 
     /**
      * Obtiene el tiempo total de pantalla por semana para un hijo.
-     * La función ha sido corregida para sumar el tiempo de la semana actual.
+     * La función ha sido corregida para sumar el tiempo de las últimas 4 semanas.
      * @param uidHijo El UID del hijo.
      * @return Un mapa donde la clave es la semana del año (Int) y el valor es el tiempo total en milisegundos (Long).
      */
     suspend fun obtenerTiempoPantallaSemanal(uidHijo: String): Map<Int, Long> {
         return try {
             val calendar = Calendar.getInstance()
-            // Obtener la fecha de inicio de la semana (lunes)
+            // Se calcula la fecha de inicio de la semana 4 semanas atrás para obtener el historial.
+            calendar.add(Calendar.WEEK_OF_YEAR, -4)
             calendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-            val inicioSemana = calendar.timeInMillis
-            // Obtener la fecha de fin de la semana (domingo a las 23:59:59)
-            calendar.add(Calendar.DAY_OF_YEAR, 7)
-            val finSemana = calendar.timeInMillis
+            calendar.set(Calendar.HOUR_OF_DAY, 0)
+            calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+            val inicioHace4Semanas = calendar.timeInMillis
 
-            // Consulta que filtra los datos de la semana actual
+            // Consulta que filtra los datos de las últimas 4 semanas
             val snapshot = db.collection("hijos").document(uidHijo)
                 .collection("uso_apps")
-                .whereGreaterThanOrEqualTo("fechaUso", inicioSemana)
-                .whereLessThan("fechaUso", finSemana)
+                .whereGreaterThanOrEqualTo("fechaUso", inicioHace4Semanas)
                 .get()
                 .await()
 
@@ -316,6 +323,7 @@ class RepositorioApps {
                 .mapValues { (_, usosDeLaSemana) ->
                     usosDeLaSemana.sumOf { it.tiempoUso }
                 }
+            Log.d(TAG, "✅ Resumen semanal cargado: $resumen")
             resumen
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error al obtener resumen de tiempo semanal: ${e.message}", e)

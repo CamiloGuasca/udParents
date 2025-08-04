@@ -114,9 +114,14 @@ class VistaModeloVinculacion(
         }
     }
 
+    /**
+     * 💡 Esta función se ha actualizado para obtener el UID del padre usando
+     * la nueva función del repositorio.
+     * @param onExito Callback que ahora recibe el UID del padre como String.
+     */
     fun vincularHijoConDatos(
         context: Context,
-        onExito: () -> Unit,
+        onExito: (String) -> Unit, // 💡 Ahora onExito recibe el UID del padre
         onError: (String) -> Unit
     ) {
         viewModelScope.launch {
@@ -127,20 +132,19 @@ class VistaModeloVinculacion(
                     return@launch
                 }
 
-                val existe = repositorio.existeCodigo(codVinAct.codigo)
-                if (!existe) {
+                // 💡 Se busca el objeto completo para obtener el UID del padre
+                val codigoVinculacionEnBD = repositorio.obtenerCodigoPorID(codVinAct.codigo)
+                if (codigoVinculacionEnBD == null) {
                     onError("Código no válido")
                     return@launch
                 }
 
-                val esValido = repositorio.verificarCodigoValido(codVinAct.codigo)
-                if (!esValido) {
+                if (!repositorio.verificarCodigoValido(codVinAct.codigo)) {
                     onError("Código expirado")
                     return@launch
                 }
 
-                val yaVinculado = repositorio.dispositivoYaVinculado(codVinAct.dispositivoHijo)
-                if (yaVinculado) {
+                if (repositorio.dispositivoYaVinculado(codVinAct.dispositivoHijo)) {
                     onError("Este dispositivo ya ha sido vinculado previamente.")
                     return@launch
                 }
@@ -153,7 +157,10 @@ class VistaModeloVinculacion(
                             } catch (e: Exception) {
                                 e.printStackTrace()
                             }
-                            onExito()
+                            // 💡 Se llama a onExito con el UID del padre obtenido del objeto
+                            codigoVinculacionEnBD.idPadre?.let {
+                                onExito(it)
+                            }
                         }
                     } else {
                         onError("No se pudo vincular el dispositivo.")
@@ -223,5 +230,4 @@ class VistaModeloVinculacion(
             }
         }
     }
-
 }

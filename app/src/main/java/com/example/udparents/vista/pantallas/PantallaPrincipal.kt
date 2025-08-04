@@ -1,5 +1,6 @@
 package com.example.udparents.vista.pantallas
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -8,12 +9,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.udparents.servicio.MiFirebaseMessagingService
 import com.example.udparents.viewmodel.VistaModeloApps
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
 
 @Composable
 fun PantallaPrincipal(
@@ -25,15 +29,32 @@ fun PantallaPrincipal(
     onIrAProgramarRestricciones: (List<Pair<String, String>>) -> Unit,
     onIrAResumenTiempoPantalla: (List<Pair<String, String>>) -> Unit,
     onIrAInformeAppsMasUsadas: (List<Pair<String, String>>) -> Unit,
-    onIrARegistroBloqueos: (List<Pair<String, String>>) -> Unit // Se pasa la lista de hijos
+    onIrARegistroBloqueos: (List<Pair<String, String>>) -> Unit
 ) {
     val vistaModelo: VistaModeloApps = viewModel()
     val hijosVinculados by vistaModelo.hijosVinculados.collectAsState()
     val uidPadre = FirebaseAuth.getInstance().currentUser?.uid
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
 
-    // Cargar hijos desde el ViewModel usando LaunchedEffect
+    // 1. Cargar hijos desde el ViewModel
     LaunchedEffect(uidPadre) {
         uidPadre?.let { vistaModelo.cargarHijos(it) }
+    }
+
+    // 2. 💡 Lógica para obtener y guardar el token de FCM cuando el padre inicie sesión
+    LaunchedEffect(uidPadre) {
+        if (uidPadre != null) {
+            coroutineScope.launch {
+                val fcmService = MiFirebaseMessagingService()
+                val token = fcmService.obtenerTokenFCM()
+                if (token != null) {
+                    fcmService.enviarTokenAFirestore(token)
+                } else {
+                    Log.e("PantallaPrincipal", "No se pudo obtener el token de FCM.")
+                }
+            }
+        }
     }
 
     Box(
@@ -102,7 +123,7 @@ fun PantallaPrincipal(
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
-                onClick = { onIrARegistroBloqueos(hijosVinculados) }, // Pasa la lista de hijos
+                onClick = { onIrARegistroBloqueos(hijosVinculados) },
                 enabled = hijosVinculados.isNotEmpty(),
                 shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6699CC)),

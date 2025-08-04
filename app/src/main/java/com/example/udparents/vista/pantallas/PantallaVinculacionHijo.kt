@@ -22,6 +22,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.udparents.servicio.RegistroUsoService
+import com.example.udparents.utilidades.SharedPreferencesUtil
 import com.example.udparents.viewmodel.VistaModeloVinculacion
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
@@ -190,9 +191,13 @@ fun PantallaVinculacionHijo(
 
                 vistaModelo.vincularHijoConDatos(
                     context = context,
-                    onExito = {
+                    onExito = { uidPadre ->
                         mensajeError = ""
                         vinculacionIniciada = true
+
+                        // 💡 NUEVO PASO: Guardar el UID del padre en SharedPreferences
+                        SharedPreferencesUtil.guardarUidPadre(context, uidPadre)
+                        Log.d("PantallaVinculacionHijo", "UID del padre guardado: $uidPadre")
 
                         permisoUsoApps.value = verificarPermisoUsoApps(context)
                         permisoAccesibilidad.value = verificarPermisoAccesibilidad(context)

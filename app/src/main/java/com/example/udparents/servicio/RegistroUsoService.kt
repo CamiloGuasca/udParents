@@ -13,6 +13,7 @@ import com.example.udparents.modelo.BloqueoRegistro
 import com.example.udparents.repositorio.RepositorioApps
 import com.example.udparents.repositorio.RepositorioBloqueos
 import com.example.udparents.utilidades.RegistroUsoApps
+import com.example.udparents.utilidades.SharedPreferencesUtil
 import com.example.udparents.vista.pantallas.PantallaBloqueoComposeActivity
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.*
@@ -25,8 +26,8 @@ class RegistroUsoService : Service() {
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private var tareaMonitoreo: Job? = null
     private var tareaRegistroUso: Job? = null
-    private val intervaloChequeoAppEnUso = 3000L // 3 segundos para el chequeo de bloqueo y el incremento "en vivo"
-    private val intervaloRegistroUso = 30 * 1000L // 30 segundos para registrar el uso en Firebase (barrido general)
+    private val intervaloChequeoAppEnUso = 3000L // 3 segundos para el chequeo de bloqueo
+    private val intervaloRegistroUso = 30 * 1000L // 30 segundos para el barrido general en Firebase
     private var paqueteBloqueadoActual: String? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -92,37 +93,41 @@ class RegistroUsoService : Service() {
 
         val nombreAppActual = obtenerNombreApp(context, paqueteActual)
 
-        // LÓGICA CLAVE: Incrementar el uso de la aplicación activa cada 3 segundos
+        // Incrementar el uso de la aplicación activa cada 3 segundos
         repositorio.incrementarUsoAplicacion(uidHijo, paqueteActual, nombreAppActual, intervaloChequeoAppEnUso)
 
-        // Ahora, obtenemos el tiempo de uso *después* de haberlo incrementado
         val tiempoUsoActual = repositorio.obtenerUsoAppDelDia(uidHijo, paqueteActual)
 
         var debeBloquear = false
-        var motivoBloqueo = "Desconocido"
+        var motivoBloqueo = ""
+        var tituloNotificacion = ""
+        var mensajeNotificacion = ""
 
         // 1. Verificar bloqueo manual
         val bloqueadaManual = repositorio.estaAppBloqueada(uidHijo, paqueteActual)
         if (bloqueadaManual) {
             debeBloquear = true
             motivoBloqueo = "Bloqueo manual"
+            tituloNotificacion = "Alerta: Aplicación bloqueada"
+            mensajeNotificacion = "Tu hijo ha intentado abrir la aplicación '$nombreAppActual' que has bloqueado manualmente."
         }
 
-        // 2. Verificar bloqueo por límite de tiempo (solo si no está ya bloqueada manualmente)
+        // 2. Verificar bloqueo por límite de tiempo
         if (!debeBloquear) {
             val tiempoLimite = repositorio.obtenerLimiteApp(uidHijo, paqueteActual)
             val bloqueadaPorLimite = tiempoLimite > 0L && tiempoUsoActual >= tiempoLimite
             if (bloqueadaPorLimite) {
                 debeBloquear = true
                 motivoBloqueo = "Límite de tiempo excedido"
+                tituloNotificacion = "Alerta: Límite de tiempo de pantalla"
+                mensajeNotificacion = "Tu hijo ha excedido el límite de tiempo para la aplicación '$nombreAppActual'."
             }
         }
 
-        // 3. Verificar bloqueo por horario (solo si no está ya bloqueada por las razones anteriores)
+        // 3. Verificar bloqueo por horario
         if (!debeBloquear) {
             val restricciones = repositorio.obtenerRestriccionesHorario(uidHijo)
             val calendar = Calendar.getInstance()
-            // Calendar.DAY_OF_WEEK usa: Domingo=1, Lunes=2, ..., Sábado=7
             val currentDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
             val currentTimeMillisOfDay = (calendar.get(Calendar.HOUR_OF_DAY) * 60 * 60 * 1000) +
                     (calendar.get(Calendar.MINUTE) * 60 * 1000) +
@@ -133,23 +138,22 @@ class RegistroUsoService : Service() {
                     (restriccion.packageName == paqueteActual || restriccion.packageName == "ALL_APPS") &&
                     restriccion.daysOfWeek.contains(currentDayOfWeek)
                 ) {
-                    // Lógica para comprobar si la hora actual está dentro de la franja de bloqueo
                     if (restriccion.startTimeMillis < restriccion.endTimeMillis) {
-                        // Horario normal (ej. 08:00 - 17:00)
                         if (currentTimeMillisOfDay >= restriccion.startTimeMillis &&
                             currentTimeMillisOfDay < restriccion.endTimeMillis) {
                             debeBloquear = true
                             motivoBloqueo = "Restricción por horario"
+                            tituloNotificacion = "Alerta: Horario de uso"
+                            mensajeNotificacion = "Tu hijo ha intentado usar la aplicación '$nombreAppActual' fuera de su horario permitido."
                             break
                         }
                     } else {
-                        // Horario que cruza la medianoche (ej. 22:00 - 06:00)
-                        // Si la hora actual es mayor o igual a la hora de inicio (ej. 22:00)
-                        // O si la hora actual es menor que la hora de fin (ej. 06:00)
                         if (currentTimeMillisOfDay >= restriccion.startTimeMillis ||
                             currentTimeMillisOfDay < restriccion.endTimeMillis) {
                             debeBloquear = true
                             motivoBloqueo = "Restricción por horario"
+                            tituloNotificacion = "Alerta: Horario de uso"
+                            mensajeNotificacion = "Tu hijo ha intentado usar la aplicación '$nombreAppActual' fuera de su horario permitido."
                             break
                         }
                     }
@@ -162,11 +166,26 @@ class RegistroUsoService : Service() {
                 paqueteBloqueadoActual = paqueteActual
                 Log.d("RegistroUsoService", "🔒 App bloqueada detectada: $nombreAppActual ($paqueteActual) - Motivo: $motivoBloqueo")
 
-                // ✅ LÓGICA AGREGADA: Registrar el intento de acceso bloqueado
+                // Enviar la notificación al padre
+                val uidPadre = SharedPreferencesUtil.obtenerUidPadre(applicationContext)
+                if (!uidPadre.isNullOrBlank()) {
+                    Log.d("RegistroUsoService", "-> Se va a enviar notificación al padre con UID: $uidPadre")
+
+                    val sender = NotificacionSender()
+                    scope.launch {
+                        sender.enviarNotificacionAlPadre(
+                            uidPadre = uidPadre,
+                            titulo = tituloNotificacion,
+                            mensaje = mensajeNotificacion
+                        )
+                    }
+                }
+
+                // Registrar el intento de acceso bloqueado
                 val repoBloqueos = RepositorioBloqueos()
                 val bloqueoRegistro = BloqueoRegistro(
                     uidHijo = uidHijo,
-                    nombrePaquete = paqueteActual, // CORREGIDO para que coincida con la clase BloqueoRegistro
+                    nombrePaquete = paqueteActual,
                     nombreApp = nombreAppActual,
                     razon = motivoBloqueo
                 )
@@ -183,7 +202,7 @@ class RegistroUsoService : Service() {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                     putExtra("nombreApp", nombreAppActual)
                     putExtra("paqueteBloqueado", paqueteActual)
-                    putExtra("motivoBloqueo", motivoBloqueo) // Opcional: pasar el motivo a la pantalla de bloqueo
+                    putExtra("motivoBloqueo", motivoBloqueo)
                 }
                 context.startActivity(intent)
             }
