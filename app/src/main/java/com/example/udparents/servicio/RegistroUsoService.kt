@@ -18,6 +18,7 @@ import com.example.udparents.vista.pantallas.PantallaBloqueoComposeActivity
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.*
 import android.app.usage.UsageStats
+import android.media.RingtoneManager
 import android.app.usage.UsageStatsManager
 import java.util.Calendar
 
@@ -29,6 +30,13 @@ class RegistroUsoService : Service() {
     private val intervaloChequeoAppEnUso = 3000L // 3 segundos para el chequeo de bloqueo
     private val intervaloRegistroUso = 30 * 1000L // 30 segundos para el barrido general en Firebase
     private var paqueteBloqueadoActual: String? = null
+    private var notificadoTiempoRestante = false
+    private var notificadoUltimosSegundos = false
+    private var lastCheckTime: Long = 0L
+    private val UMBRAL_TIEMPO_RESTANTE_MS = 60 * 1000L // 1 minuto antes del límite
+    private var notified60s = false
+    private var notified30s = false
+    private var notified10s = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d("RegistroUsoService", "✅ Servicio iniciado correctamente")
@@ -90,13 +98,24 @@ class RegistroUsoService : Service() {
             return
         }
         val repositorio = RepositorioApps()
-
         val nombreAppActual = obtenerNombreApp(context, paqueteActual)
 
-        // Incrementar el uso de la aplicación activa cada 3 segundos
-        repositorio.incrementarUsoAplicacion(uidHijo, paqueteActual, nombreAppActual, intervaloChequeoAppEnUso)
+        // ✅ CALCULAR EL TIEMPO TRANSCURRIDO REAL
+        val now = System.currentTimeMillis()
+        val timeElapsed = if (lastCheckTime == 0L) 0L else now - lastCheckTime
+        lastCheckTime = now
+
+        // Incrementar el uso de la aplicación activa con el tiempo transcurrido real
+        repositorio.incrementarUsoAplicacion(uidHijo, paqueteActual, nombreAppActual, timeElapsed)
 
         val tiempoUsoActual = repositorio.obtenerUsoAppDelDia(uidHijo, paqueteActual)
+
+        // Reinicia las banderas si la app actual ha cambiado
+        if (paqueteActual != paqueteBloqueadoActual) {
+            notified60s = false
+            notified30s = false
+            notified10s = false
+        }
 
         var debeBloquear = false
         var motivoBloqueo = ""
@@ -115,6 +134,29 @@ class RegistroUsoService : Service() {
         // 2. Verificar bloqueo por límite de tiempo
         if (!debeBloquear) {
             val tiempoLimite = repositorio.obtenerLimiteApp(uidHijo, paqueteActual)
+            val tiempoRestante = tiempoLimite - tiempoUsoActual
+
+            if (tiempoLimite > 0L) {
+                when {
+                    tiempoRestante <= 60_000L && tiempoRestante > 30_000L && !notified60s -> {
+                        mostrarNotificacionTiempoRestante(nombreAppActual, tiempoRestante)
+                        notified60s = true
+                    }
+                    tiempoRestante <= 30_000L && tiempoRestante > 10_000L && !notified30s -> {
+                        mostrarNotificacionTiempoRestante(nombreAppActual, tiempoRestante)
+                        notified30s = true
+                    }
+                    tiempoRestante <= 10_000L && tiempoRestante > 0L && !notified10s -> {
+                        mostrarNotificacionUltimosSegundos(nombreAppActual)
+                        notified10s = true
+                    }
+                    tiempoRestante > 60_000L -> {
+                        notified60s = false
+                        notified30s = false
+                        notified10s = false
+                    }
+                }
+            }
             val bloqueadaPorLimite = tiempoLimite > 0L && tiempoUsoActual >= tiempoLimite
             if (bloqueadaPorLimite) {
                 debeBloquear = true
@@ -161,17 +203,13 @@ class RegistroUsoService : Service() {
             }
         }
 
-        // ... otras líneas de la función verificarAppEnUso()
-
         if (debeBloquear) {
             if (paqueteActual != paqueteBloqueadoActual) {
                 paqueteBloqueadoActual = paqueteActual
                 Log.d("RegistroUsoService", "🔒 App bloqueada detectada: $nombreAppActual ($paqueteActual) - Motivo: $motivoBloqueo")
 
-                // 1. Obtener el UID del padre
                 val uidPadre = SharedPreferencesUtil.obtenerUidPadre(applicationContext) ?: ""
 
-                // 2. Enviar la notificación PUSH al padre si el UID está disponible
                 if (uidPadre.isNotBlank()) {
                     Log.d("RegistroUsoService", "-> Se va a enviar notificación PUSH al padre con UID: $uidPadre")
                     val sender = NotificacionSender()
@@ -183,7 +221,6 @@ class RegistroUsoService : Service() {
                         )
                     }
 
-                    // 3. Registrar el intento de acceso bloqueado, pasando el UID del padre
                     val repoBloqueos = RepositorioBloqueos()
                     val bloqueoRegistro = BloqueoRegistro(
                         uidHijo = uidHijo,
@@ -193,7 +230,6 @@ class RegistroUsoService : Service() {
                     )
                     scope.launch {
                         try {
-                            // ✅ LLAMADA CORREGIDA: Ahora se pasan los tres parámetros
                             repoBloqueos.registrarBloqueo(uidHijo, uidPadre, bloqueoRegistro)
                             Log.d("RegistroUsoService", "✅ Intento de bloqueo registrado en Firebase.")
                         } catch (e: Exception) {
@@ -216,7 +252,6 @@ class RegistroUsoService : Service() {
             }
             paqueteBloqueadoActual = null
         }
-
     }
 
     private fun obtenerNombreApp(context: Context, packageName: String): String {
@@ -275,5 +310,71 @@ class RegistroUsoService : Service() {
         } else {
             applicationContext.startService(restartService)
         }
+    }
+    private fun mostrarNotificacionTiempoRestante(nombreApp: String, tiempoRestanteMs: Long) {
+        val minutos = tiempoRestanteMs / 60000
+        val segundos = (tiempoRestanteMs % 60000) / 1000
+        val tiempoTexto = if (minutos > 0) "$minutos min" else "$segundos segundos"
+
+        val canalId = "canal_tiempo_restante"
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val sonido = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
+            val canal = NotificationChannel(
+                canalId,
+                "Tiempo restante de uso",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Notificación cuando el tiempo de uso está por agotarse"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 300, 200, 300)
+                setSound(sonido, null)
+            }
+            manager.createNotificationChannel(canal)
+        }
+
+        val notificacion = NotificationCompat.Builder(this, canalId)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("⏰ Queda poco tiempo")
+            .setContentText("Queda $tiempoTexto para usar la app '$nombreApp'")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setVibrate(longArrayOf(0, 300, 200, 300))
+            .build()
+
+        manager.notify(2, notificacion)
+    }
+    private fun mostrarNotificacionUltimosSegundos(nombreApp: String) {
+        val canalId = "canal_ultimos_segundos"
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val sonido = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
+            val canal = NotificationChannel(
+                canalId,
+                "Últimos segundos de uso",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Notificación crítica cuando solo quedan segundos de uso"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 300, 200, 300)
+                setSound(sonido, null)
+            }
+            manager.createNotificationChannel(canal)
+        }
+
+        val notificacion = NotificationCompat.Builder(this, canalId)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("⚠️ Últimos segundos")
+            .setContentText("Se bloqueará la app '$nombreApp' en pocos segundos")
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setAutoCancel(true)
+            .setVibrate(longArrayOf(0, 300, 200, 300))
+            .build()
+
+        manager.notify(3, notificacion)
     }
 }
