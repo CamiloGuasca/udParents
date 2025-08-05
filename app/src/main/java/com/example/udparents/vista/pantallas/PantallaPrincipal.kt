@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.udparents.servicio.MiFirebaseMessagingService
 import com.example.udparents.viewmodel.VistaModeloApps
+import com.example.udparents.viewmodel.VistaModeloUsuario
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 
@@ -36,6 +37,13 @@ fun PantallaPrincipal(
     val uidPadre = FirebaseAuth.getInstance().currentUser?.uid
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+    val vistaModeloUsuario: VistaModeloUsuario = viewModel()
+
+    LaunchedEffect(uidPadre) {
+        uidPadre?.let { vistaModeloUsuario.cargarEstadoAlerta(it) }
+    }
+    val alertaActivada by vistaModeloUsuario.alertaContenido.collectAsState()
+
 
     // 1. Cargar hijos desde el ViewModel
     LaunchedEffect(uidPadre) {
@@ -73,6 +81,14 @@ fun PantallaPrincipal(
         ) {
             Text("Bienvenido 👋", fontSize = 24.sp, color = Color(0xFF003366), textAlign = TextAlign.Center)
             Spacer(modifier = Modifier.height(32.dp))
+            // 🔁 Estado local para saber si está activada la alerta (por ahora por defecto en false)
+            Switch(
+                checked = alertaActivada,
+                onCheckedChange = { activado ->
+                    uidPadre?.let { vistaModeloUsuario.actualizarEstadoAlerta(it, activado) }
+                }
+            )
+
 
             Button(
                 onClick = { onIrAVinculacionPadre() },

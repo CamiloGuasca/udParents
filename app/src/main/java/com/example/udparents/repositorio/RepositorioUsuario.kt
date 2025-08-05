@@ -64,4 +64,28 @@ class RepositorioUsuario {
     fun obtenerUsuarioActual(): FirebaseUser? {
         return auth.currentUser
     }
+    fun obtenerEstadoAlertaContenido(
+        uid: String,
+        onResultado: (Boolean?) -> Unit
+    ) {
+        db.collection("usuarios").document(uid).get()
+            .addOnSuccessListener { documento ->
+                onResultado(documento.getBoolean("alertaContenidoProhibido"))
+            }
+            .addOnFailureListener {
+                onResultado(null)
+            }
+    }
+
+    fun actualizarEstadoAlertaContenido(
+        uid: String,
+        nuevoEstado: Boolean,
+        onResultado: (Boolean) -> Unit
+    ) {
+        db.collection("usuarios").document(uid)
+            .update("alertaContenidoProhibido", nuevoEstado)
+            .addOnSuccessListener { onResultado(true) }
+            .addOnFailureListener { onResultado(false) }
+    }
+
 }

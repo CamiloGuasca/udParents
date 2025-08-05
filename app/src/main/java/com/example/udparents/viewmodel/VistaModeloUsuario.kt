@@ -13,6 +13,9 @@ class VistaModeloUsuario : ViewModel() {
 
     private val repositorio = RepositorioUsuario()
 
+    private val _alertaContenido = MutableStateFlow(false)
+    val alertaContenido: StateFlow<Boolean> = _alertaContenido
+
     private val _cargando = MutableStateFlow(false)
     val cargando: StateFlow<Boolean> = _cargando
 
@@ -98,6 +101,20 @@ class VistaModeloUsuario : ViewModel() {
     }
     fun limpiarMensaje() {
         _mensaje.value = null
+    }
+    fun cargarEstadoAlerta(uid: String) {
+        repositorio.obtenerEstadoAlertaContenido(uid) { estado ->
+            estado?.let { _alertaContenido.value = it }
+        }
+    }
+
+    fun actualizarEstadoAlerta(uid: String, nuevoEstado: Boolean) {
+        _alertaContenido.value = nuevoEstado
+        repositorio.actualizarEstadoAlertaContenido(uid, nuevoEstado) { exito ->
+            if (!exito) {
+                // Podrías revertir el cambio local o mostrar un mensaje
+            }
+        }
     }
 }
 

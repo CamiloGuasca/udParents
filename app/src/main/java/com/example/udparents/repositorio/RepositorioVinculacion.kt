@@ -143,4 +143,20 @@ class RepositorioVinculacion {
             }
             .addOnFailureListener { onResult(false) }
     }
+    fun obtenerEstadoAlertaContenidoPadre(
+        uidPadre: String,
+        onResultado: (Boolean) -> Unit
+    ) {
+        FirebaseFirestore.getInstance().collection("usuarios")
+            .document(uidPadre)
+            .get()
+            .addOnSuccessListener { documento ->
+                val activado = documento.getBoolean("alertaContenidoProhibido") ?: false
+                onResultado(activado)
+            }
+            .addOnFailureListener {
+                onResultado(false)
+            }
+    }
+
 }

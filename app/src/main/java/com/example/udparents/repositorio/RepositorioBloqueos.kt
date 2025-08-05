@@ -12,16 +12,13 @@ class RepositorioBloqueos {
     private val db = FirebaseFirestore.getInstance()
     private val TAG = "RepositorioBloqueos"
 
-    suspend fun registrarBloqueo(uidHijo: String, nuevoBloqueo: BloqueoRegistro) {
+    suspend fun registrarBloqueo(uidHijo: String, uidPadre: String, nuevoBloqueo: BloqueoRegistro) {
         val fecha = obtenerFechaActual()
         val hora = obtenerHoraActual()
         val paquete = nuevoBloqueo.nombrePaquete
 
         val docId = "$fecha-$paquete"
-        val docRef = db.collection("hijos")
-            .document(uidHijo)
-            .collection("registros_bloqueo")
-            .document(docId)
+        val docRef = db.collection("registrosBloqueo").document(docId)
 
         try {
             db.runTransaction { transaction ->
@@ -39,7 +36,9 @@ class RepositorioBloqueos {
                     val nuevoRegistro = nuevoBloqueo.copy(
                         fecha = fecha,
                         contadorIntentos = 1,
-                        intentos = listOf(hora)
+                        intentos = listOf(hora),
+                        uidPadre = uidPadre,
+                        uidHijo = uidHijo
                     )
                     transaction.set(docRef, nuevoRegistro)
                 }
@@ -52,8 +51,8 @@ class RepositorioBloqueos {
 
     suspend fun obtenerRegistrosDeBloqueo(uidHijo: String): List<BloqueoRegistro> {
         return try {
-            val snapshot = db.collection("hijos").document(uidHijo)
-                .collection("registros_bloqueo")
+            val snapshot = db.collection("registrosBloqueo")
+                .whereEqualTo("uidHijo", uidHijo)
                 .get()
                 .await()
 

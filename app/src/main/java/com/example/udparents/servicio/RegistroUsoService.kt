@@ -161,16 +161,19 @@ class RegistroUsoService : Service() {
             }
         }
 
+        // ... otras líneas de la función verificarAppEnUso()
+
         if (debeBloquear) {
             if (paqueteActual != paqueteBloqueadoActual) {
                 paqueteBloqueadoActual = paqueteActual
                 Log.d("RegistroUsoService", "🔒 App bloqueada detectada: $nombreAppActual ($paqueteActual) - Motivo: $motivoBloqueo")
 
-                // Enviar la notificación al padre
-                val uidPadre = SharedPreferencesUtil.obtenerUidPadre(applicationContext)
-                if (!uidPadre.isNullOrBlank()) {
-                    Log.d("RegistroUsoService", "-> Se va a enviar notificación al padre con UID: $uidPadre")
+                // 1. Obtener el UID del padre
+                val uidPadre = SharedPreferencesUtil.obtenerUidPadre(applicationContext) ?: ""
 
+                // 2. Enviar la notificación PUSH al padre si el UID está disponible
+                if (uidPadre.isNotBlank()) {
+                    Log.d("RegistroUsoService", "-> Se va a enviar notificación PUSH al padre con UID: $uidPadre")
                     val sender = NotificacionSender()
                     scope.launch {
                         sender.enviarNotificacionAlPadre(
@@ -179,22 +182,23 @@ class RegistroUsoService : Service() {
                             mensaje = mensajeNotificacion
                         )
                     }
-                }
 
-                // Registrar el intento de acceso bloqueado
-                val repoBloqueos = RepositorioBloqueos()
-                val bloqueoRegistro = BloqueoRegistro(
-                    uidHijo = uidHijo,
-                    nombrePaquete = paqueteActual,
-                    nombreApp = nombreAppActual,
-                    razon = motivoBloqueo
-                )
-                scope.launch {
-                    try {
-                        repoBloqueos.registrarBloqueo(uidHijo, bloqueoRegistro)
-                        Log.d("RegistroUsoService", "✅ Intento de bloqueo registrado en Firebase.")
-                    } catch (e: Exception) {
-                        Log.e("RegistroUsoService", "❌ Error al registrar bloqueo: ${e.message}", e)
+                    // 3. Registrar el intento de acceso bloqueado, pasando el UID del padre
+                    val repoBloqueos = RepositorioBloqueos()
+                    val bloqueoRegistro = BloqueoRegistro(
+                        uidHijo = uidHijo,
+                        nombrePaquete = paqueteActual,
+                        nombreApp = nombreAppActual,
+                        razon = motivoBloqueo
+                    )
+                    scope.launch {
+                        try {
+                            // ✅ LLAMADA CORREGIDA: Ahora se pasan los tres parámetros
+                            repoBloqueos.registrarBloqueo(uidHijo, uidPadre, bloqueoRegistro)
+                            Log.d("RegistroUsoService", "✅ Intento de bloqueo registrado en Firebase.")
+                        } catch (e: Exception) {
+                            Log.e("RegistroUsoService", "❌ Error al registrar bloqueo: ${e.message}", e)
+                        }
                     }
                 }
 
@@ -212,6 +216,7 @@ class RegistroUsoService : Service() {
             }
             paqueteBloqueadoActual = null
         }
+
     }
 
     private fun obtenerNombreApp(context: Context, packageName: String): String {
