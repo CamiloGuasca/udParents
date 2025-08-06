@@ -46,30 +46,32 @@ class RepositorioApps {
             .collection("uso_apps").document(docId)
 
         try {
-            // ✅ Usa una transacción para asegurar la consistencia.
-            db.runTransaction { transaction ->
-                val snapshot = transaction.get(docRef)
-                if (snapshot.exists()) {
-                    // Si el documento existe, incrementa el valor de tiempoUso.
-                    transaction.update(docRef, "tiempoUso", FieldValue.increment(incrementBy))
-                    Log.d(TAG, "📈 Uso de $packageName incrementado en $incrementBy ms.")
-                } else {
-                    // Si el documento no existe, lo creamos.
-                    val appUsoInicial = AppUso(
-                        nombrePaquete = packageName,
-                        nombreApp = appName,
-                        fechaUso = calendar.timeInMillis,
-                        tiempoUso = incrementBy
-                    )
-                    transaction.set(docRef, appUsoInicial)
-                    Log.d(TAG, "➕ Documento de uso para $packageName creado con $incrementBy ms.")
-                }
-                null
-            }.await()
+            // Intenta obtener el documento primero
+            val docSnapshot = docRef.get().await()
+
+            if (docSnapshot.exists()) {
+                // Si el documento ya existe, usa FieldValue.increment() para actualizar de forma atómica.
+                // Esto garantiza que múltiples actualizaciones concurrentes no sobrescriban el valor.
+                docRef.update("tiempoUso", FieldValue.increment(incrementBy)).await()
+                Log.d(TAG, "📈 Uso de $packageName incrementado en $incrementBy ms.")
+            } else {
+                // Si el documento no existe, lo creamos con el valor inicial.
+                val appUsoInicial = AppUso(
+                    nombrePaquete = packageName,
+                    nombreApp = appName,
+                    fechaUso = calendar.timeInMillis,
+                    tiempoUso = incrementBy
+                )
+                // Usamos SetOptions.merge() para crear el documento o fusionarlo si ya existe con otros campos
+                docRef.set(appUsoInicial, SetOptions.merge()).await()
+                Log.d(TAG, "➕ Documento de uso para $packageName creado con $incrementBy ms.")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error inesperado al incrementar/crear uso de $packageName: ${e.message}", e)
         }
     }
+
+    // Las demás funciones se mantienen sin cambios
 
     suspend fun guardarRestriccionHorario(uidHijo: String, restriccion: RestriccionHorario) {
         val docRef = db.collection("hijos").document(uidHijo)
