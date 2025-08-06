@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -315,6 +317,29 @@ fun PantallaControlApps(
                                     Text("Limitar")
                                 }
                             }
+                            if (tiempoLimite > 0L) {
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Button(
+                                    onClick = {
+                                        vistaModeloApps.establecerLimite(uidHijo, app.nombrePaquete, 0L)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.error,
+                                        contentColor = Color.White
+                                    ),
+                                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Quitar límite",
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Quitar límite")
+                                }
+                            }
+
                         }
                         // Este divisor está dentro del Column principal de cada ítem.
                         Divider(
