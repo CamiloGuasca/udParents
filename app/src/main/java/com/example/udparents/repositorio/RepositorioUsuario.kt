@@ -14,81 +14,90 @@ class RepositorioUsuario {
         usuario: Usuario,
         onResultado: (Boolean, String?) -> Unit
     ) {
-        auth.createUserWithEmailAndPassword(usuario.correo, usuario.contrasena)
+        // Crea la cuenta en Firebase Auth
+        auth.createUserWithEmailAndPassword(usuario.correo.trim(), usuario.contrasena)
             .addOnCompleteListener { tarea ->
-                if (tarea.isSuccessful) {
-                    val usuarioFirestore = Usuario(usuario.nombre.trim(), usuario.correo.trim())
-                    val uid = auth.currentUser?.uid ?: ""
-
-                    // 🟢 CAMBIO: Se añade el timestampRegistro al documento
-                    db.collection("usuarios")
-                        .document(uid)
-                        .set(mapOf(
-                            "nombre" to usuarioFirestore.nombre,
-                            "correo" to usuarioFirestore.correo,
-                            "timestampRegistro" to System.currentTimeMillis() // 🟢 ¡AQUÍ ESTÁ EL CAMBIO CLAVE!
-                        ))
-                        .addOnSuccessListener {
-                            onResultado(true, null)
-                        }
-                        .addOnFailureListener { error ->
-                            onResultado(false, "Error guardando datos: ${error.message}")
-                        }
-                } else {
+                if (!tarea.isSuccessful) {
                     onResultado(false, tarea.exception?.message)
+                    return@addOnCompleteListener
                 }
+
+                // No escribimos en Firestore aquí. Sólo enviamos el correo de verificación.
+                val user = auth.currentUser
+                if (user == null) {
+                    onResultado(false, "No se pudo obtener el usuario actual tras el registro.")
+                    return@addOnCompleteListener
+                }
+
+                // Enviar correo de verificación (usa Success/Failure, no Complete)
+                user.sendEmailVerification()
+                    .addOnSuccessListener {
+                        // Envío aceptado por el backend → mostramos éxito
+                        onResultado(true, null)
+                    }
+                    .addOnFailureListener { e ->
+                        // Falló la solicitud de envío del correo
+                        onResultado(false, "No se pudo enviar el correo de verificación: ${e.message}")
+                    }
             }
     }
 
     fun iniciarSesion(usuario: Usuario, onResultado: (Boolean, String?) -> Unit) {
-        auth.signInWithEmailAndPassword(usuario.correo, usuario.contrasena)
+        auth.signInWithEmailAndPassword(usuario.correo.trim(), usuario.contrasena)
             .addOnCompleteListener { tarea ->
-                if (tarea.isSuccessful) {
-                    val usuarioFirebase = auth.currentUser
-                    if (usuarioFirebase != null) {
-                        // 🟢 VERIFICACIÓN DE CADUCIDAD
-                        if (!usuarioFirebase.isEmailVerified) {
-                            // Si el correo no está verificado, se chequea el timestamp
-                            db.collection("usuarios").document(usuarioFirebase.uid).get()
-                                .addOnSuccessListener { documento ->
-                                    val timestampRegistro = documento.getLong("timestampRegistro")
-                                    if (timestampRegistro != null) {
-                                        val tiempoActual = System.currentTimeMillis()
-                                        val tresMinutosEnMs = 3 * 60 * 1000
-
-                                        if (tiempoActual - timestampRegistro > tresMinutosEnMs) {
-                                            // ⚠️ El tiempo ha expirado, eliminar la cuenta
-                                            usuarioFirebase.delete().addOnCompleteListener {
-                                                db.collection("usuarios").document(usuarioFirebase.uid).delete()
-                                                onResultado(false, "El tiempo para verificar el correo ha expirado. Por favor, regístrate de nuevo.")
-                                            }
-                                        } else {
-                                            // El tiempo no ha expirado
-                                            onResultado(false, "Debes verificar tu correo.")
-                                        }
-                                    } else {
-                                        // No se encontró el timestamp, mostrar error.
-                                        onResultado(false, "Error: No se encontró el registro de tiempo.")
-                                    }
-                                }
-                                .addOnFailureListener {
-                                    onResultado(false, "Error al acceder a los datos de registro.")
-                                }
-                        } else {
-                            // El correo está verificado
-                            onResultado(true, null)
-                        }
-                    } else {
-                        // Esto no debería ocurrir si la tarea fue exitosa.
-                        onResultado(false, "Usuario no encontrado.")
-                    }
-                } else {
+                if (!tarea.isSuccessful) {
                     onResultado(false, tarea.exception?.localizedMessage)
+                    return@addOnCompleteListener
                 }
+
+                val usuarioFirebase = auth.currentUser
+                if (usuarioFirebase == null) {
+                    onResultado(false, "Usuario no encontrado.")
+                    return@addOnCompleteListener
+                }
+
+                // Refresca el estado antes de leer isEmailVerified (por si acaba de verificar)
+                usuarioFirebase.reload()
+                    .addOnSuccessListener {
+                        if (!usuarioFirebase.isEmailVerified) {
+                            onResultado(false, "Debes verificar tu correo para iniciar sesión.")
+                            return@addOnSuccessListener
+                        }
+
+                        // Email verificado → asegurar documento en Firestore
+                        val uid = usuarioFirebase.uid
+                        val ref = db.collection("usuarios").document(uid)
+
+                        ref.get()
+                            .addOnSuccessListener { snap ->
+                                if (snap.exists()) {
+                                    // Ya hay perfil → continuar
+                                    onResultado(true, null)
+                                } else {
+                                    // Primer login verificado → crear perfil
+                                    val datos = mapOf(
+                                        "nombre" to usuario.nombre.trim(),      // usa el nombre que tengas en memoria
+                                        "correo" to usuario.correo.trim(),
+                                        "createdAt" to System.currentTimeMillis(),
+                                        // Puedes agregar flags por defecto aquí si los usas:
+                                        // "alertaContenidoProhibido" to false
+                                    )
+                                    ref.set(datos)
+                                        .addOnSuccessListener { onResultado(true, null) }
+                                        .addOnFailureListener { e ->
+                                            onResultado(false, "Error guardando perfil del usuario: ${e.message}")
+                                        }
+                                }
+                            }
+                            .addOnFailureListener { e ->
+                                onResultado(false, "Error al verificar perfil del usuario: ${e.message}")
+                            }
+                    }
+                    .addOnFailureListener { e ->
+                        onResultado(false, "No se pudo actualizar el estado del usuario: ${e.message}")
+                    }
             }
     }
-
-// ... (resto del código)
 
     fun recuperarContrasena(usuario: Usuario, onResultado: (Boolean, String?) -> Unit) {
         auth.sendPasswordResetEmail(usuario.correo)

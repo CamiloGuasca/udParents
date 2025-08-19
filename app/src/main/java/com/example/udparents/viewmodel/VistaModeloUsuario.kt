@@ -43,47 +43,57 @@ class VistaModeloUsuario : ViewModel() {
         nombre.trim().replace("\\s+".toRegex(), " ")
     fun registrarUsuario(onResultado: (Boolean, String?) -> Unit) {
         val usuarioActual = _usuario.value
+        Log.d("VMUsuario", "registrarUsuario() -> start con: correo=${usuarioActual.correo}")
+
+        // Validaciones UI
         if (!validarNombrePadre(usuarioActual.nombre)) {
-            _mensaje.value = "Escribe nombre y apellido (mín. $MIN_LETRAS_SIN_ESPACIOS letras en total)."
-            onResultado(false, _mensaje.value)
+            val msg = "Escribe nombre y apellido (mín. $MIN_LETRAS_SIN_ESPACIOS letras en total)."
+            _mensaje.value = msg
+            Log.w("VMUsuario", "Nombre inválido: '${usuarioActual.nombre}'")
+            onResultado(false, msg)
             return
         }
         if (!validarContrasenaSegura(usuarioActual.contrasena)) {
-            _mensaje.value = "La contraseña debe tener al menos 8 caracteres, incluyendo mayúsculas, minúsculas, números y símbolos."
-            onResultado(false, _mensaje.value)
+            val msg = "La contraseña debe tener al menos 8 caracteres, incluyendo mayúsculas, minúsculas, números y símbolos."
+            _mensaje.value = msg
+            Log.w("VMUsuario", "Contraseña no cumple política")
+            onResultado(false, msg)
             return
         }
-
         if (!usuarioActual.esValido()) {
-            _mensaje.value = "Por favor completa los campos correctamente"
-            onResultado(false, _mensaje.value)
+            val msg = "Por favor completa los campos correctamente"
+            _mensaje.value = msg
+            Log.w("VMUsuario", "Modelo de usuario no válido")
+            onResultado(false, msg)
             return
         }
 
-        _cargando.value = true
+        // Normaliza nombre (espacios, etc.)
         val usuarioNormalizado = usuarioActual.copy(
             nombre = normalizarNombreEntrada(usuarioActual.nombre)
         )
+
+        _cargando.value = true
+        _mensaje.value = null
+        Log.d("VMUsuario", "Llamando a repositorio.registrarUsuario()")
+
+        // IMPORTANTE: el repositorio ya envía el correo de verificación
         repositorio.registrarUsuario(usuarioNormalizado) { exito, error ->
             _cargando.value = false
             if (exito) {
-                val usuarioFirebase = repositorio.obtenerUsuarioActual()
-                usuarioFirebase?.sendEmailVerification()
-                    ?.addOnCompleteListener { verificacion ->
-                        if (verificacion.isSuccessful) {
-                            _mensaje.value = "✅ Registro exitoso. Revisa tu correo para verificar tu cuenta."
-                            onResultado(true, null)
-                        } else {
-                            _mensaje.value = "⚠️ Usuario creado, pero no se pudo enviar el correo de verificación."
-                            onResultado(false, _mensaje.value)
-                        }
-                    }
+                // NO volvemos a enviar el correo acá.
+                _mensaje.value = "✅ Registro exitoso. Revisa tu correo para verificar tu cuenta."
+                Log.d("VMUsuario", "Registro OK y verificación enviada por el repositorio")
+                onResultado(true, null)
             } else {
-                _mensaje.value = error ?: "Error desconocido"
-                onResultado(false, _mensaje.value)
+                val msg = error ?: "Error desconocido"
+                _mensaje.value = msg
+                Log.e("VMUsuario", "Fallo en registro: $msg")
+                onResultado(false, msg)
             }
         }
     }
+
 
     fun iniciarSesion(onExito: () -> Unit, onError: (String) -> Unit) {
         val usuarioActual = _usuario.value
