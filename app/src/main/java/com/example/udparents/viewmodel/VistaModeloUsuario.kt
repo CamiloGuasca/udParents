@@ -24,6 +24,10 @@ class VistaModeloUsuario : ViewModel() {
 
     private val _usuario = MutableStateFlow(Usuario())
     val usuario: StateFlow<Usuario> = _usuario
+    private companion object {
+        // mínimo de letras (sin contar espacios); súbelo si quieres algo más estricto
+        const val MIN_LETRAS_SIN_ESPACIOS = 10
+    }
     fun actualizarCorreo(correo: String) {
         _usuario.value = _usuario.value.copy(correo = correo.trim())
     }
@@ -33,10 +37,22 @@ class VistaModeloUsuario : ViewModel() {
     }
 
     fun actualizarNombre(nombre: String) {
-        _usuario.value = _usuario.value.copy(nombre = nombre.trim())
+        _usuario.value = _usuario.value.copy(nombre = nombre)
     }
+    private fun normalizarNombreEntrada(nombre: String): String =
+        nombre.trim().replace("\\s+".toRegex(), " ")
     fun registrarUsuario(onResultado: (Boolean, String?) -> Unit) {
         val usuarioActual = _usuario.value
+        if (!validarNombrePadre(usuarioActual.nombre)) {
+            _mensaje.value = "Escribe nombre y apellido (mín. $MIN_LETRAS_SIN_ESPACIOS letras en total)."
+            onResultado(false, _mensaje.value)
+            return
+        }
+        if (!validarContrasenaSegura(usuarioActual.contrasena)) {
+            _mensaje.value = "La contraseña debe tener al menos 8 caracteres, incluyendo mayúsculas, minúsculas, números y símbolos."
+            onResultado(false, _mensaje.value)
+            return
+        }
 
         if (!usuarioActual.esValido()) {
             _mensaje.value = "Por favor completa los campos correctamente"
@@ -45,7 +61,10 @@ class VistaModeloUsuario : ViewModel() {
         }
 
         _cargando.value = true
-        repositorio.registrarUsuario(usuarioActual) { exito, error ->
+        val usuarioNormalizado = usuarioActual.copy(
+            nombre = normalizarNombreEntrada(usuarioActual.nombre)
+        )
+        repositorio.registrarUsuario(usuarioNormalizado) { exito, error ->
             _cargando.value = false
             if (exito) {
                 val usuarioFirebase = repositorio.obtenerUsuarioActual()
@@ -115,6 +134,26 @@ class VistaModeloUsuario : ViewModel() {
                 // Podrías revertir el cambio local o mostrar un mensaje
             }
         }
+    }
+    private fun validarNombrePadre(nombre: String): Boolean {
+        val n = normalizarNombreEntrada(nombre)
+
+        // Debe tener al menos dos palabras (nombre y apellido) con 2+ caracteres cada una
+        val partes = n.split(" ")
+        val tieneNombreApellido = partes.size >= 2 &&
+                partes[0].length >= 2 &&
+                partes[1].length >= 2
+
+        // Mínimo de letras totales (sin contar espacios)
+        val largoOk = n.replace(" ", "").length >= MIN_LETRAS_SIN_ESPACIOS
+
+        return tieneNombreApellido && largoOk
+    }
+
+    private fun validarContrasenaSegura(contrasena: String): Boolean {
+        // La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula, un dígito y un carácter especial.
+        val regex = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$".toRegex()
+        return contrasena.matches(regex)
     }
 }
 

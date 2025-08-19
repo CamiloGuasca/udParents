@@ -29,13 +29,19 @@ class VistaModeloVinculacion(
     private val _codigoVinculacion = MutableStateFlow( CodigoVinculacion())
     val codigoVinculacion: StateFlow<CodigoVinculacion?> = _codigoVinculacion
 
+    private companion object {
 
+        const val MIN_LETRAS_SIN_ESPACIOS = 10
+    }
     fun actualizarCodigo(codigo: String) {
         _codigoVinculacion.value = _codigoVinculacion.value.copy(codigo = codigo.trim())
     }
     fun actualizarNombreHijo(nombreHijo: String) {
-        _codigoVinculacion.value = _codigoVinculacion.value.copy(nombreHijo = nombreHijo.trim())
+        _codigoVinculacion.value = _codigoVinculacion.value.copy(
+            nombreHijo = nombreHijo
+        )
     }
+
     fun actualizarEdadHijo(edadHijo: Int) {
         _codigoVinculacion.value = _codigoVinculacion.value.copy(edadHijo = edadHijo)
     }
@@ -127,6 +133,20 @@ class VistaModeloVinculacion(
         viewModelScope.launch {
             try {
                 val codVinAct = _codigoVinculacion.value
+
+                if (!validarNombreHijo(codVinAct.nombreHijo)) {
+                    onError("Escribe nombre y apellido (mín. $MIN_LETRAS_SIN_ESPACIOS letras en total).")
+                    return@launch
+                }
+                if (!validarEdadHijo(codVinAct.edadHijo)) {
+                    onError("La edad del hijo debe estar entre 1 y 17 años.")
+                    return@launch
+                }
+                if (!validarSexoHijo(codVinAct.sexoHijo)) {
+                    onError("El sexo del hijo debe ser 'M' o 'F' o (masculino/femenino)")
+                    return@launch
+                }
+
                 if (codVinAct.dispositivoHijo.isBlank()) {
                     onError("No se ha autenticado el dispositivo del hijo.")
                     return@launch
@@ -148,8 +168,11 @@ class VistaModeloVinculacion(
                     onError("Este dispositivo ya ha sido vinculado previamente.")
                     return@launch
                 }
+                val codVinNormalizado = codVinAct.copy(
+                    nombreHijo = normalizarNombreEntrada(codVinAct.nombreHijo)
+                )
 
-                repositorio.vincularConDatos(codVinAct) { exito ->
+                repositorio.vincularConDatos(codVinNormalizado) { exito ->
                     if (exito) {
                         viewModelScope.launch {
                             try {
@@ -230,4 +253,31 @@ class VistaModeloVinculacion(
             }
         }
     }
+    private fun validarNombreHijo(nombre: String): Boolean {
+        val n = normalizarNombreEntrada(nombre)
+
+        // Debe haber al menos "nombre" y "apellido"
+        val partes = n.split(" ")
+        val tieneNombreApellido = partes.size >= 2 &&
+                partes[0].length >= 2 &&
+                partes[1].length >= 2
+
+        // Mínimo de letras (sin contar espacios)
+        val largoOk = n.replace(" ", "").length >= MIN_LETRAS_SIN_ESPACIOS
+
+        return tieneNombreApellido && largoOk
+    }
+
+    private fun validarEdadHijo(edad: Int): Boolean {
+        // La edad debe estar entre 1 y 17 años
+        return edad in 1..17
+    }
+    private fun validarSexoHijo(sexo: String): Boolean {
+        val s = sexo.trim().lowercase()
+        return s == "m" || s == "f" || s == "masculino" || s == "femenino"
+    }
+    /** Normaliza el nombre: quita espacios a los extremos y colapsa espacios internos en uno */
+    private fun normalizarNombreEntrada(nombre: String): String =
+        nombre.trim().replace("\\s+".toRegex(), " ")
+
 }
