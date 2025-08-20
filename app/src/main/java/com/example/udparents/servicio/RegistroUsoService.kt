@@ -28,6 +28,10 @@ import android.app.usage.UsageStatsManager
 import android.os.Process
 import android.provider.Settings
 import java.util.Calendar
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
+import com.example.udparents.seguridad.AdminReceiver
+
 
 class RegistroUsoService : Service() {
 
@@ -56,6 +60,10 @@ class RegistroUsoService : Service() {
         Log.d("RegistroUsoService", "✅ Servicio iniciado correctamente")
         Log.d("RegistroUsoService", "🧬 Servicio sigue corriendo tras cierre")
         mostrarNotificacion()
+// 🔒 Asegurar que el admin de dispositivo esté activo (impide desinstalación)
+        if (!isDeviceAdminActive(applicationContext)) {
+            solicitarActivacionDeviceAdmin(applicationContext)
+        }
 
         tareaMonitoreo = scope.launch {
             while (isActive) {
@@ -424,73 +432,62 @@ class RegistroUsoService : Service() {
     }
 
 
-    /** Verifica permisos críticos y (1) muestra bloqueo por permisos cuando faltan
-     *  (full-screen en el teléfono del HIJO) y (2) avisa al PADRE con mensajes claros
-     *  cuando se desactivan o restauran, con cooldown para no spamear.  */
+    /** Verifica permisos críticos y:
+     * (1) muestra BLOQUEO full-screen en el teléfono del hijo cuando faltan,
+     * (2) avisa al PADRE cuando se desactivan o restauran (mensajes claros),
+     * (3) incluye Admin de dispositivo como requisito.
+     */
     private fun verificarPermisosEsenciales(): Boolean {
         val accesibilidadOk = isAccessibilityServiceEnabled(applicationContext)
         val usoOk = isUsageAccessGranted(applicationContext)
-        val permisosOk = accesibilidadOk && usoOk
+        val adminOk = isDeviceAdminActive(applicationContext)   // ⬅️ Admin integrado
+        val permisosOk = accesibilidadOk && usoOk && adminOk
 
         val ahora = System.currentTimeMillis()
         val cambioEstado = (ultimoEstadoPermisos == null) || (ultimoEstadoPermisos != permisosOk)
         val fueraDeCooldown = (ahora - ultimoAvisoPermisosMs) >= COOLDOWN_AVISO_MS
 
         if (!permisosOk) {
-            // 🔒 Texto para la pantalla del HIJO (debe ser explícito sobre qué falta)
-            val motivoBloqueo = when {
-                !accesibilidadOk && !usoOk -> "Accesibilidad y uso de datos desactivados"
-                !accesibilidadOk -> "Accesibilidad desactivada"
-                else -> "Uso de datos desactivado"
-            }
+            // Construir textos claros para HIJO y PADRE
+            val faltan = mutableListOf<String>()
+            if (!accesibilidadOk) faltan.add("accesibilidad")
+            if (!usoOk)           faltan.add("uso de datos")
+            if (!adminOk)         faltan.add("administrador de dispositivo")
 
-            // 📣 Texto para el PADRE (claro y sin true/false)
-            val msgPadre = when {
-                !accesibilidadOk && !usoOk -> "Tu hijo deshabilitó los permisos de accesibilidad y uso de datos."
-                !accesibilidadOk -> "Tu hijo deshabilitó el permiso de accesibilidad."
-                else -> "Tu hijo deshabilitó el permiso de uso de datos."
-            }
+            val motivoBloqueoHijo = "Permisos desactivados: ${faltan.joinToString(" y ")}"
+            val mensajePadre = "Tu hijo deshabilitó ${faltan.joinToString(" y ")}."
 
-            // ⛔️ Mantener el COMPORTAMIENTO del HIJO: mostrar pantalla/FS cuando falten permisos
+            // Mostrar FULL-SCREEN en el teléfono del hijo sin esperar clic
             if (!mostrandoBloqueoPermisos) {
-                Log.w("RegistroUsoService",
-                    "🚫 Permisos faltantes (Accesibilidad=$accesibilidadOk, Uso=$usoOk). Lanzando fullScreenIntent.")
                 mostrandoBloqueoPermisos = true
-                mostrarBloqueoPermisosFullScreen(motivoBloqueo) // <- sigue igual que antes
+                Log.w("RegistroUsoService", "🚫 Faltan permisos ($motivoBloqueoHijo). Full-screen.")
+                mostrarBloqueoPermisosFullScreen(motivoBloqueoHijo)
             }
 
-            // 👨‍👧 Aviso al PADRE en el primer cambio a fallo o si pasó el cooldown
+            // Aviso al padre (primer cambio a fallo o tras cooldown)
             if (cambioEstado || fueraDeCooldown) {
                 avisarPadreCambioPermisos(
                     titulo = "⚠️ Permiso deshabilitado",
-                    mensaje = msgPadre
+                    mensaje = mensajePadre
                 )
                 ultimoAvisoPermisosMs = ahora
             }
 
-            huboFalloPermisos = true
             ultimoEstadoPermisos = false
+            huboFalloPermisos = true
             return false
 
         } else {
-            // ✅ Volvieron los permisos: quitar estado de pantalla en el HIJO si estaba activa
+            // Todos OK: quitar estado de bloqueo y avisar al padre una vez
             if (mostrandoBloqueoPermisos) {
                 Log.d("RegistroUsoService", "✅ Permisos restaurados. Volviendo a monitoreo normal.")
                 mostrandoBloqueoPermisos = false
             }
 
-            // 👨‍👧 Aviso al PADRE inmediatamente cuando se restauran después de un fallo
             if (huboFalloPermisos && (ultimoEstadoPermisos != true)) {
-                val msgRestaurado = when {
-                    accesibilidadOk && usoOk -> "Tu hijo reactivó los permisos de accesibilidad y uso de datos."
-                    accesibilidadOk -> "Tu hijo reactivó el permiso de accesibilidad."
-                    usoOk -> "Tu hijo reactivó el permiso de uso de datos."
-                    else -> "Tu hijo reactivó los permisos."
-                }
-
                 avisarPadreCambioPermisos(
                     titulo = "✅ Permisos restaurados",
-                    mensaje = msgRestaurado
+                    mensaje = "Tu hijo reactivó accesibilidad, uso de datos y administrador de dispositivo."
                 )
                 ultimoAvisoPermisosMs = ahora
                 huboFalloPermisos = false
@@ -500,7 +497,6 @@ class RegistroUsoService : Service() {
             return true
         }
     }
-
 
     private fun mostrarBloqueoPermisosFullScreen(motivo: String) {
         val channelId = "canal_bloqueo_permisos_fullscreen"
@@ -607,5 +603,29 @@ class RegistroUsoService : Service() {
             }
         }
     }
+    // --- Helpers Device Admin: comprobar y solicitar activación ---
+
+    private fun isDeviceAdminActive(context: Context): Boolean {
+        val dpm = context.getSystemService(DevicePolicyManager::class.java)
+        val cn = ComponentName(context, AdminReceiver::class.java)
+        return dpm?.isAdminActive(cn) == true
+    }
+
+    private fun solicitarActivacionDeviceAdmin(context: Context) {
+        val dpm = context.getSystemService(DevicePolicyManager::class.java)
+        val cn = ComponentName(context, AdminReceiver::class.java)
+        if (dpm?.isAdminActive(cn) != true) {
+            val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, cn)
+                putExtra(
+                    DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                    "UdParents necesita este permiso para impedir que se desinstale sin autorización."
+                )
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent) // abre la pantalla de activación
+        }
+    }
+
 
 }

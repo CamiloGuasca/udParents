@@ -13,6 +13,9 @@
     <!-- Permiso especial para servicios de accesibilidad -->
     <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE" tools:ignore="ProtectedPermissions" />
 
+    <!-- (Opcional pero recomendado en Android 13+ si muestras notificaciones al usuario)
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" /> -->
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -20,6 +23,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.UdParents">
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
@@ -29,7 +33,6 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-
 
         <!-- Actividad principal -->
         <activity
@@ -42,6 +45,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- FCM -->
         <service
             android:name=".servicio.MiFirebaseMessagingService"
             android:exported="false">
@@ -49,13 +54,14 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
-        <!-- Actividad para bloqueo -->
+
+        <!-- Actividad para bloqueo (hijo) -->
         <activity
             android:name=".vista.pantallas.PantallaBloqueoComposeActivity"
             android:exported="false"
             android:theme="@style/Theme.UdParents" />
 
-        <!-- Servicio en primer plano actual (puede quedar o eliminarse más adelante) -->
+        <!-- Servicio en primer plano de monitoreo -->
         <service
             android:name=".servicio.RegistroUsoService"
             android:enabled="true"
@@ -78,7 +84,22 @@
                 android:resource="@xml/accesibilidad_config" />
         </service>
 
-        <!-- Receptor para iniciar el servicio después del reinicio -->
+        <!-- 🔒 Device Admin Receiver (IMPIDE DESINSTALACIÓN mientras esté activo) -->
+        <receiver
+            android:name=".seguridad.AdminReceiver"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:label="@string/app_name">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin_policies" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+        <!-- 🔒 (Fin Device Admin) -->
+
+        <!-- Reinicio: reanuda el servicio tras BOOT -->
         <receiver
             android:name=".servicio.BootReceiver"
             android:enabled="true"
