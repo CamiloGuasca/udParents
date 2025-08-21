@@ -40,7 +40,8 @@ class RepositorioVinculacion {
             .update(
                 mapOf(
                     "vinculado" to true,
-                    "dispositivoHijo" to idHijo
+                    "dispositivoHijo" to idHijo,
+                    "timestampVinculacion" to System.currentTimeMillis()
                 )
             )
             .addOnSuccessListener { onResult(true) }
@@ -79,7 +80,14 @@ class RepositorioVinculacion {
             "dispositivoHijo" to codigoVinculacion.dispositivoHijo,
             "nombreHijo" to codigoVinculacion.nombreHijo,
             "edadHijo" to codigoVinculacion.edadHijo,
-            "sexoHijo" to codigoVinculacion.sexoHijo
+            "sexoHijo" to codigoVinculacion.sexoHijo,
+            // ✅ Consentimiento
+            "termsAccepted" to codigoVinculacion.termsAccepted,
+            "termsVersion" to codigoVinculacion.termsVersion,
+            "termsAcceptedAt" to (codigoVinculacion.termsAcceptedAt ?: System.currentTimeMillis()),
+
+            // (opcional) útil para auditoría
+            "timestampVinculacion" to System.currentTimeMillis()
         )
 
         coleccionCodigos

@@ -48,6 +48,13 @@ class VistaModeloVinculacion(
     fun actualizarSexoHijo(sexoHijo: String) {
         _codigoVinculacion.value = _codigoVinculacion.value.copy(sexoHijo = sexoHijo.trim())
     }
+    fun actualizarTermsAceptados(aceptado: Boolean) {
+        _codigoVinculacion.value = _codigoVinculacion.value.copy(
+            termsAccepted = aceptado,
+            termsVersion = "1.0",
+            termsAcceptedAt = if (aceptado) System.currentTimeMillis() else null
+        )
+    }
     fun generarCodigo(idPadre: String) {
         viewModelScope.launch {
             var nuevoCodigo: String
@@ -87,31 +94,7 @@ class VistaModeloVinculacion(
         }
     }
 
-    fun validarCodigoVinculacion(
-        codigo: String,
-        onExito: () -> Unit,
-        onError: (String) -> Unit
-    ) {
-        viewModelScope.launch {
-            try {
-                val existe = repositorio.existeCodigo(codigo)
-                if (existe) {
-                    val idHijo = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-                    repositorio.marcarCodigoComoVinculado(codigo, idHijo) { actualizado ->
-                        if (actualizado) {
-                            onExito()
-                        } else {
-                            onError("No se pudo actualizar la vinculación.")
-                        }
-                    }
-                } else {
-                    onError("Código no válido")
-                }
-            } catch (e: Exception) {
-                onError("Error al validar el código: ${e.message}")
-            }
-        }
-    }
+
 
     fun cargarDispositivosVinculados(idPadre: String) {
         viewModelScope.launch {
@@ -144,6 +127,10 @@ class VistaModeloVinculacion(
                 }
                 if (!validarSexoHijo(codVinAct.sexoHijo)) {
                     onError("El sexo del hijo debe ser 'M' o 'F' o (masculino/femenino)")
+                    return@launch
+                }
+                if (!codVinAct.termsAccepted) {
+                    onError("Debes aceptar los Términos y Condiciones para continuar.")
                     return@launch
                 }
 
@@ -281,3 +268,4 @@ class VistaModeloVinculacion(
         nombre.trim().replace("\\s+".toRegex(), " ")
 
 }
+

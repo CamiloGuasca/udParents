@@ -1,3 +1,4 @@
+// Archivo: com.example.udparents.vista.pantallas.PantallaVinculacionHijo.kt
 package com.example.udparents.vista.pantallas
 
 import android.app.Activity
@@ -12,7 +13,15 @@ import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,7 +56,6 @@ fun PantallaVinculacionHijo(
 
     var uidHijo by remember { mutableStateOf(auth.currentUser?.uid) }
 
-    // --- Estados de permisos (ahora 3) ---
     val permisoUsoApps = remember { mutableStateOf(verificarPermisoUsoApps(context)) }
     val permisoAccesibilidad = remember { mutableStateOf(verificarPermisoAccesibilidad(context)) }
     val permisoAdmin = remember { mutableStateOf(isDeviceAdminActive(context)) }
@@ -59,8 +67,8 @@ fun PantallaVinculacionHijo(
     var mostrarDialogoAdmin by remember { mutableStateOf(false) }
     var mostrarDialogoExito by remember { mutableStateOf(false) }
     var vinculacionIniciada by remember { mutableStateOf(false) }
+    var mostrarTerminosDialog by remember { mutableStateOf(false) }
 
-    // ====== Validaciones de formulario (como las tenías) ======
     val nombreHijo = codigoVinculacion?.nombreHijo.orEmpty()
     val nombreNormalizado = remember(nombreHijo) {
         nombreHijo.trim().replace("\\s+".toRegex(), " ")
@@ -69,19 +77,14 @@ fun PantallaVinculacionHijo(
     val tieneNombreApellido = partes.size >= 2 && partes[0].length >= 2 && partes[1].length >= 2
     val largoOk = nombreNormalizado.replace(" ", "").length >= 10
     val nombreValido = nombreHijo.isNotBlank() && tieneNombreApellido && largoOk
-
     val edadValida = (codigoVinculacion?.edadHijo ?: 0) in 1..17
-
     val sexoTexto = codigoVinculacion?.sexoHijo.orEmpty()
-    val sexoValido = sexoTexto.trim().equals("m", true)
-            || sexoTexto.trim().equals("f", true)
-            || sexoTexto.trim().equals("masculino", true)
-            || sexoTexto.trim().equals("femenino", true)
-
+    val sexoValido = sexoTexto.trim().equals("m", true) || sexoTexto.trim().equals("f", true) ||
+            sexoTexto.trim().equals("masculino", true) || sexoTexto.trim().equals("femenino", true)
     val codigoValido = (codigoVinculacion?.codigo?.length == 6)
-    val formularioValido = codigoValido && nombreValido && edadValida && sexoValido
+    val termsAceptados = codigoVinculacion?.termsAccepted == true
+    val formularioValido = codigoValido && nombreValido && edadValida && sexoValido && termsAceptados
 
-    // ====== Re-lectura de permisos al volver de Ajustes ======
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(Unit) {
         val observer = LifecycleEventObserver { _, event ->
@@ -91,7 +94,6 @@ fun PantallaVinculacionHijo(
                 permisoAdmin.value = isDeviceAdminActive(context)
 
                 if (permisoUsoApps.value && permisoAccesibilidad.value && permisoAdmin.value) {
-                    // todos ok
                     ocultarTodosLosDialogos(
                         setUso = { mostrarDialogoPermisoUso = it },
                         setAcc = { mostrarDialogoAccesibilidad = it },
@@ -104,7 +106,6 @@ fun PantallaVinculacionHijo(
                         activity?.finish()
                     }
                 } else {
-                    // muestra los que falten
                     mostrarDialogoPermisoUso = !permisoUsoApps.value
                     mostrarDialogoAccesibilidad = !permisoAccesibilidad.value
                     mostrarDialogoAdmin = !permisoAdmin.value
@@ -115,7 +116,6 @@ fun PantallaVinculacionHijo(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // ====== Autenticación anónima (como la tenías) ======
     LaunchedEffect(Unit) {
         if (auth.currentUser == null) {
             auth.signInAnonymously().addOnCompleteListener {
@@ -131,11 +131,20 @@ fun PantallaVinculacionHijo(
         }
     }
 
-    // ====== Diálogo: USO ======
     if (mostrarDialogoPermisoUso && !permisoUsoApps.value) {
         AlertDialog(
             onDismissRequest = {},
-            title = { Text("Permiso de uso de apps requerido") },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Settings,
+                        contentDescription = "Permiso de uso",
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Permiso de uso de apps requerido")
+                }
+            },
             text = { Text("Activa el permiso para acceder al uso de aplicaciones.") },
             confirmButton = {
                 TextButton(onClick = {
@@ -145,11 +154,20 @@ fun PantallaVinculacionHijo(
         )
     }
 
-    // ====== Diálogo: ACCESIBILIDAD ======
     if (mostrarDialogoAccesibilidad && !permisoAccesibilidad.value) {
         AlertDialog(
             onDismissRequest = {},
-            title = { Text("Activar servicio de bloqueo") },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Settings,
+                        contentDescription = "Accesibilidad",
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Activar servicio de bloqueo")
+                }
+            },
             text = { Text("Activa el servicio UDParents en Accesibilidad para poder bloquear apps.") },
             confirmButton = {
                 TextButton(onClick = { pedirPermisoAccesibilidad(context) }) {
@@ -159,13 +177,22 @@ fun PantallaVinculacionHijo(
         )
     }
 
-    // ====== Diálogo: ADMINISTRADOR DE DISPOSITIVO ======
     if (mostrarDialogoAdmin && !permisoAdmin.value) {
         AlertDialog(
             onDismissRequest = {},
-            title = { Text("Administrador de dispositivo requerido") },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Security,
+                        contentDescription = "Administrador de dispositivo",
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Administrador de dispositivo")
+                }
+            },
             text = {
-                Text("Activa UdParents como administrador de dispositivo para impedir su desinstalación sin autorización.")
+                Text("Activa UdParents como administrador para impedir su desinstalación sin autorización.")
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -175,7 +202,6 @@ fun PantallaVinculacionHijo(
         )
     }
 
-    // ====== Diálogo: ÉXITO ======
     if (mostrarDialogoExito) {
         AlertDialog(
             onDismissRequest = { activity?.finish() },
@@ -189,165 +215,256 @@ fun PantallaVinculacionHijo(
         )
     }
 
-    // ====== UI principal ======
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("Vinculación del dispositivo", style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = codigoVinculacion?.codigo ?: "",
-            onValueChange = { raw ->
-                mensajeError = ""
-                val soloDigitos = raw.filter { it.isDigit() }.take(6)
-                vistaModelo.actualizarCodigo(soloDigitos)
-            },
-            label = { Text("Código de vinculación (6 dígitos)") },
-            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth(),
-            isError = (codigoVinculacion?.codigo?.length ?: 0) in 1..5,
-            supportingText = {
-                val len = codigoVinculacion?.codigo?.length ?: 0
-                if (len in 1..5) Text("Debe tener 6 dígitos.")
-            }
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = codigoVinculacion?.nombreHijo ?: "",
-            onValueChange = {
-                mensajeError = ""
-                vistaModelo.actualizarNombreHijo(it)
-            },
-            label = { Text("Nombre y apellido del hijo") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Text,
-                capitalization = KeyboardCapitalization.Words,
-                imeAction = ImeAction.Next
-            ),
-            isError = (codigoVinculacion?.nombreHijo?.isNotBlank() == true) && !nombreValido,
-            supportingText = {
-                if ((codigoVinculacion?.nombreHijo?.isNotBlank() == true) && !nombreValido) {
-                    Text("Escribe nombre y apellido (mín. 10 letras en total).")
+    if (mostrarTerminosDialog) {
+        val scrollState = rememberScrollState()
+        AlertDialog(
+            onDismissRequest = { mostrarTerminosDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Términos y Condiciones",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Términos y Condiciones")
                 }
-            }
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = codigoVinculacion?.edadHijo?.takeIf { it > 0 }?.toString() ?: "",
-            onValueChange = { txt ->
-                mensajeError = ""
-                val valor = txt.toIntOrNull()
-                if (valor == null) vistaModelo.actualizarEdadHijo(0)
-                else vistaModelo.actualizarEdadHijo(valor)
             },
-            label = { Text("Edad del hijo (1–17)") },
-            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth(),
-            isError = (codigoVinculacion?.edadHijo ?: 0) !in 1..17,
-            supportingText = {
-                if ((codigoVinculacion?.edadHijo ?: 0) !in 1..17) {
-                    Text("Ingresa una edad válida entre 1 y 17.")
-                }
-            }
-        )
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 0.dp, max = 320.dp)
+                        .verticalScroll(scrollState)
+                ) {
+                    Text(
+                        """
+UdParents es una aplicación destinada exclusivamente a ayudar a madres, padres o acudientes a administrar el uso de aplicaciones en el dispositivo del menor bajo su cuidado.
 
-        Spacer(modifier = Modifier.height(8.dp))
-        var abierto by remember { mutableStateOf(false) }
-        val opcionesSexo = listOf("M", "F")
+• La app recolecta y procesa información de uso de aplicaciones con el único fin de aplicar límites de tiempo, bloqueos por horarios y alertas al acudiente.
+• UdParents NO tiene fines maliciosos ni accede a contenido personal como mensajes, fotos o archivos, salvo lo estrictamente necesario para aplicar las funciones descritas.
+• El acudiente es responsable de configurar adecuadamente la app y de informar al menor sobre su uso.
+• La aceptación de estos términos autoriza a UdParents a registrar el consentimiento, la versión de términos aceptada y la fecha/hora del consentimiento.
+• Puedes consultar, actualizar o retirar el consentimiento desinstalando la app o contactando al soporte del proyecto académico.
 
-        ExposedDropdownMenuBox(
-            expanded = abierto,
-            onExpandedChange = { abierto = !abierto },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            OutlinedTextField(
-                value = codigoVinculacion?.sexoHijo ?: "",
-                onValueChange = { /* readOnly */ },
-                label = { Text("Sexo del hijo (M/F)") },
-                readOnly = true,
-                modifier = Modifier
-                    .menuAnchor()
-                    .fillMaxWidth(),
-                isError = sexoTexto.isNotBlank() && !sexoValido,
-                supportingText = {
-                    if (sexoTexto.isBlank()) Text("Selecciona M o F.")
-                    else if (!sexoValido) Text("Valor inválido. Selecciona M o F.")
-                }
-            )
-            ExposedDropdownMenu(expanded = abierto, onDismissRequest = { abierto = false }) {
-                opcionesSexo.forEach { opcion ->
-                    DropdownMenuItem(
-                        text = { Text(opcion) },
-                        onClick = {
-                            mensajeError = ""
-                            vistaModelo.actualizarSexoHijo(opcion)
-                            abierto = false
-                        }
+Al seleccionar “Acepto”, confirmas que eres el acudiente del menor y que autorizas el uso descrito.
+                    """.trimIndent(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = {
-                vistaModelo.vincularHijoConDatos(
-                    context = context,
-                    onExito = { uidPadre ->
-                        mensajeError = ""
-                        vinculacionIniciada = true
-
-                        SharedPreferencesUtil.guardarUidPadre(context, uidPadre)
-                        Log.d("PantallaVinculacionHijo", "UID del padre guardado: $uidPadre")
-
-                        // refrescar estados
-                        permisoUsoApps.value = verificarPermisoUsoApps(context)
-                        permisoAccesibilidad.value = verificarPermisoAccesibilidad(context)
-                        permisoAdmin.value = isDeviceAdminActive(context)
-
-                        // muestra diálogos por cada permiso que falte
-                        mostrarDialogoPermisoUso = !permisoUsoApps.value
-                        mostrarDialogoAccesibilidad = !permisoAccesibilidad.value
-                        mostrarDialogoAdmin = !permisoAdmin.value
-
-                        if (permisoUsoApps.value && permisoAccesibilidad.value && permisoAdmin.value) {
-                            mostrarDialogoExito = true
-                            iniciarServicioRegistroUso(context)
-                        }
-                    },
-                    onError = { mensajeError = it }
-                )
             },
-            enabled = formularioValido,
-            modifier = Modifier.fillMaxWidth()
-        ) { Text("Vincular") }
+            confirmButton = {
+                TextButton(onClick = {
+                    vistaModelo.actualizarTermsAceptados(true)
+                    mostrarTerminosDialog = false
+                }) {
+                    Text("Acepto")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrarTerminosDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        TextButton(onClick = { onVolverAlPadre() }) {
-            Text("Volver al menú principal")
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Vinculación del dispositivo") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            )
         }
-
-        if (mensajeError.isNotEmpty()) {
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(horizontal = 24.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Spacer(modifier = Modifier.height(16.dp))
-            Text(mensajeError, color = Color.Red)
+
+            OutlinedTextField(
+                value = codigoVinculacion?.codigo ?: "",
+                onValueChange = { raw ->
+                    mensajeError = ""
+                    val soloDigitos = raw.filter { it.isDigit() }.take(6)
+                    vistaModelo.actualizarCodigo(soloDigitos)
+                },
+                label = { Text("Código de vinculación (6 dígitos)") },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = "Código") },
+                keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+                isError = (codigoVinculacion?.codigo?.length ?: 0) in 1..5,
+                supportingText = {
+                    val len = codigoVinculacion?.codigo?.length ?: 0
+                    if (len in 1..5) Text("Debe tener 6 dígitos.", color = MaterialTheme.colorScheme.error)
+                }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedTextField(
+                value = codigoVinculacion?.nombreHijo ?: "",
+                onValueChange = {
+                    mensajeError = ""
+                    vistaModelo.actualizarNombreHijo(it)
+                },
+                label = { Text("Nombre y apellido del hijo") },
+                leadingIcon = { Icon(Icons.Default.Person, contentDescription = "Nombre") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    capitalization = KeyboardCapitalization.Words,
+                    imeAction = ImeAction.Next
+                ),
+                isError = (codigoVinculacion?.nombreHijo?.isNotBlank() == true) && !nombreValido,
+                supportingText = {
+                    if ((codigoVinculacion?.nombreHijo?.isNotBlank() == true) && !nombreValido) {
+                        Text("Escribe nombre y apellido (mín. 10 letras en total).", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedTextField(
+                value = codigoVinculacion?.edadHijo?.takeIf { it > 0 }?.toString() ?: "",
+                onValueChange = { txt ->
+                    mensajeError = ""
+                    val valor = txt.toIntOrNull()
+                    if (valor == null) vistaModelo.actualizarEdadHijo(0)
+                    else vistaModelo.actualizarEdadHijo(valor)
+                },
+                label = { Text("Edad del hijo (1–17)") },
+                keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+                isError = (codigoVinculacion?.edadHijo ?: 0) !in 1..17,
+                supportingText = {
+                    if ((codigoVinculacion?.edadHijo ?: 0) !in 1..17) {
+                        Text("Ingresa una edad válida entre 1 y 17.", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+            var abierto by remember { mutableStateOf(false) }
+            val opcionesSexo = listOf("M", "F")
+            ExposedDropdownMenuBox(
+                expanded = abierto,
+                onExpandedChange = { abierto = !abierto },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = codigoVinculacion?.sexoHijo ?: "",
+                    onValueChange = { /* readOnly */ },
+                    label = { Text("Sexo del hijo (M/F)") },
+                    readOnly = true,
+                    leadingIcon = { Icon(imageVector = Icons.Filled.Person, contentDescription = "Sexo") },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth(),
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = abierto) },
+                    isError = sexoTexto.isNotBlank() && !sexoValido,
+                    supportingText = {
+                        if (sexoTexto.isBlank()) Text("Selecciona M o F.")
+                        else if (!sexoValido) Text("Valor inválido. Selecciona M o F.", color = MaterialTheme.colorScheme.error)
+                    }
+                )
+                ExposedDropdownMenu(expanded = abierto, onDismissRequest = { abierto = false }) {
+                    opcionesSexo.forEach { opcion ->
+                        DropdownMenuItem(
+                            text = { Text(opcion) },
+                            onClick = {
+                                mensajeError = ""
+                                vistaModelo.actualizarSexoHijo(opcion)
+                                abierto = false
+                            }
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Checkbox(
+                    checked = codigoVinculacion?.termsAccepted == true,
+                    onCheckedChange = { checked ->
+                        vistaModelo.actualizarTermsAceptados(checked)
+                    }
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Acepto los",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    TextButton(onClick = { mostrarTerminosDialog = true }) {
+                        Text(
+                            "Términos y Condiciones",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(0.dp),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = {
+                    vistaModelo.vincularHijoConDatos(
+                        context = context,
+                        onExito = { uidPadre ->
+                            mensajeError = ""
+                            vinculacionIniciada = true
+                            SharedPreferencesUtil.guardarUidPadre(context, uidPadre)
+                            Log.d("PantallaVinculacionHijo", "UID del padre guardado: $uidPadre")
+                            permisoUsoApps.value = verificarPermisoUsoApps(context)
+                            permisoAccesibilidad.value = verificarPermisoAccesibilidad(context)
+                            permisoAdmin.value = isDeviceAdminActive(context)
+                            mostrarDialogoPermisoUso = !permisoUsoApps.value
+                            mostrarDialogoAccesibilidad = !permisoAccesibilidad.value
+                            mostrarDialogoAdmin = !permisoAdmin.value
+                            if (permisoUsoApps.value && permisoAccesibilidad.value && permisoAdmin.value) {
+                                mostrarDialogoExito = true
+                                iniciarServicioRegistroUso(context)
+                            }
+                        },
+                        onError = { mensajeError = it }
+                    )
+                },
+                enabled = formularioValido,
+                modifier = Modifier.fillMaxWidth().height(48.dp)
+            ) {
+                Text("Vincular")
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            TextButton(onClick = { onVolverAlPadre() }) {
+                Text("Volver al menú principal")
+            }
+
+            if (mensajeError.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(mensajeError, color = MaterialTheme.colorScheme.error)
+            }
         }
     }
 }
 
-/* =========================
- * Helpers de permisos
- * ========================= */
+// Resto de tus funciones auxiliares (verificarPermisoUsoApps, etc.)
+// Estas funciones no necesitan ser modificadas.
 
 private fun ocultarTodosLosDialogos(
     setUso: (Boolean) -> Unit,
@@ -399,8 +516,6 @@ fun iniciarServicioRegistroUso(context: Context) {
     }
 }
 
-/* ===== Admin de dispositivo ===== */
-
 fun isDeviceAdminActive(context: Context): Boolean {
     val dpm = context.getSystemService(DevicePolicyManager::class.java)
     val cn = ComponentName(context, AdminReceiver::class.java)
@@ -410,15 +525,11 @@ fun isDeviceAdminActive(context: Context): Boolean {
 fun solicitarActivacionDeviceAdmin(context: Context) {
     val dpm = context.getSystemService(DevicePolicyManager::class.java)
     val cn = ComponentName(context, AdminReceiver::class.java)
-
-    // 1) Si ya está activo, salir
     if (dpm?.isAdminActive(cn) == true) {
         Toast.makeText(context, "Administrador de dispositivo ya está activo", Toast.LENGTH_SHORT).show()
         Log.d("AdminIntent", "Ya activo, no se abre nada")
         return
     }
-
-    // 2) Intent principal: activar administrador
     val addIntent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
         putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, cn)
         putExtra(
@@ -432,8 +543,6 @@ fun solicitarActivacionDeviceAdmin(context: Context) {
     } else {
         Log.w("AdminIntent", "Fallo ACTION_ADD_DEVICE_ADMIN")
     }
-
-    // 3) Fallback #1: pantalla de administradores de dispositivo (literal para evitar 'unresolved')
     val adminsIntent = Intent("android.settings.ACTION_DEVICE_ADMIN_SETTINGS")
     if (startIntentSafely(context, adminsIntent)) {
         Toast.makeText(context, "Abriendo \"Administradores de dispositivo\"…", Toast.LENGTH_SHORT).show()
@@ -442,8 +551,6 @@ fun solicitarActivacionDeviceAdmin(context: Context) {
     } else {
         Log.w("AdminIntent", "Fallo abrir ACTION_DEVICE_ADMIN_SETTINGS (literal)")
     }
-
-    // 4) Fallback #2: Ajustes de Seguridad (desde ahí el usuario entra a administradores)
     val securityIntent = Intent(Settings.ACTION_SECURITY_SETTINGS)
     if (startIntentSafely(context, securityIntent)) {
         Toast.makeText(context, "Ve a \"Administradores de dispositivo\" y activa UdParents.", Toast.LENGTH_LONG).show()
@@ -454,7 +561,6 @@ fun solicitarActivacionDeviceAdmin(context: Context) {
     }
 }
 
-/** Arranca un intent si hay activity que lo maneje; añade FLAG_ACTIVITY_NEW_TASK si hace falta */
 private fun startIntentSafely(context: Context, intent: Intent): Boolean {
     val pm = context.packageManager
     val canHandle = intent.resolveActivity(pm) != null
@@ -471,4 +577,3 @@ private fun startIntentSafely(context: Context, intent: Intent): Boolean {
         false
     }
 }
-
