@@ -25,12 +25,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.udparents.modelo.CodigoVinculacion
 import com.example.udparents.viewmodel.VistaModeloVinculacion
 import com.google.firebase.auth.FirebaseAuth
-import androidx.compose.ui.graphics.vector.ImageVector
 
-// =================================================================================================
-// ARCHIVO CORREGIDO: PantallaDispositivosVinculados.kt
-// Se pasan los colores como parámetros a las funciones de diálogo para resolver la "unresolved reference".
-// =================================================================================================
+
+// Se han implementado las validaciones reutilizables del ViewModel.
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -126,12 +123,21 @@ fun PantallaDispositivosVinculados(
         AddEditHijoDialog(
             dispositivo = dispositivoAEditar!!,
             onDismiss = { mostrarDialogoEdicion = false },
-            onSave = {
-                viewModel.actualizarVinculacion(idPadre, it)
+            onSave = { actualizado ->
+                // Normalizamos nombre y estandarizamos sexo a M/F antes de guardar
+                val nombreNorm = viewModel.normalizarNombreEntrada(actualizado.nombreHijo)
+                val sexoMF = when (actualizado.sexoHijo.trim().lowercase()) {
+                    "m", "masculino" -> "M"
+                    "f", "femenino" -> "F"
+                    else -> actualizado.sexoHijo // por si ya pasa "M"/"F"
+                }
+                val corregido = actualizado.copy(nombreHijo = nombreNorm, sexoHijo = sexoMF)
+                viewModel.actualizarVinculacion(idPadre, corregido)
                 mostrarDialogoEdicion = false
             },
             primaryLight = primaryLight,
-            accentColor = accentColor
+            accentColor = accentColor,
+            validator = { n, e, s -> viewModel.validarPerfil(n, e, s) }
         )
     }
 
@@ -192,6 +198,12 @@ fun DispositivoVinculadoCard(
             Spacer(modifier = Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
+                val sexoLegible = when (dispositivo.sexoHijo.uppercase()) {
+                    "M" -> "Masculino"
+                    "F" -> "Femenino"
+                    else -> dispositivo.sexoHijo
+                }
+
                 Text(
                     "Nombre: ${dispositivo.nombreHijo}",
                     fontSize = 18.sp,
@@ -200,7 +212,7 @@ fun DispositivoVinculadoCard(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text("Edad: ${dispositivo.edadHijo}", fontSize = 14.sp, color = onSurfaceColor)
-                Text("Sexo: ${dispositivo.sexoHijo}", fontSize = 14.sp, color = onSurfaceColor)
+                Text("Sexo: $sexoLegible", fontSize = 14.sp, color = onSurfaceColor)
                 Text(
                     "UID: ${dispositivo.dispositivoHijo}",
                     fontSize = 10.sp,
@@ -229,18 +241,40 @@ fun DispositivoVinculadoCard(
     }
 }
 
-// Nuevo composable para el diálogo de edición
+// Nuevo composable para el diálogo de edición (versión actualizada)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditHijoDialog(
     dispositivo: CodigoVinculacion,
     onDismiss: () -> Unit,
     onSave: (CodigoVinculacion) -> Unit,
     primaryLight: Color,
-    accentColor: Color
+    accentColor: Color,
+    validator: (String, Int, String) -> String?
 ) {
     var nombre by remember { mutableStateOf(dispositivo.nombreHijo) }
-    var edad by remember { mutableStateOf(dispositivo.edadHijo.toString()) }
-    var sexo by remember { mutableStateOf(dispositivo.sexoHijo) }
+    var edadTexto by remember { mutableStateOf(dispositivo.edadHijo.takeIf { it > 0 }?.toString() ?: "") }
+    var sexo by remember {
+        mutableStateOf(
+            when (dispositivo.sexoHijo.trim().lowercase()) {
+                "m", "masculino" -> "M"
+                "f", "femenino" -> "F"
+                else -> dispositivo.sexoHijo // por si ya viene "M"/"F"
+            }
+        )
+    }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    // Dropdown para sexo
+    var abierto by remember { mutableStateOf(false) }
+    val opcionesSexo = listOf("M", "F")
+
+    fun validarYSetError() {
+        val edadInt = edadTexto.toIntOrNull() ?: 0
+        error = validator(nombre, edadInt, sexo)
+    }
+
+    LaunchedEffect(nombre, edadTexto, sexo) { validarYSetError() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -249,40 +283,88 @@ fun AddEditHijoDialog(
             Column {
                 OutlinedTextField(
                     value = nombre,
-                    onValueChange = { nombre = it },
-                    label = { Text("Nombre") },
-                    modifier = Modifier.fillMaxWidth()
+                    onValueChange = {
+                        nombre = it
+                        validarYSetError()
+                    },
+                    label = { Text("Nombre y apellido") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Words
+                    ),
+                    isError = error?.contains("apellido") == true
                 )
+
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = edad,
-                    onValueChange = { edad = it },
-                    label = { Text("Edad") },
+                    value = edadTexto,
+                    onValueChange = { nuevo ->
+                        val soloDigitos = nuevo.filter { it.isDigit() }.take(2)
+                        edadTexto = soloDigitos
+                        validarYSetError()
+                    },
+                    label = { Text("Edad (1–17)") },
                     keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = error?.contains("edad") == true
                 )
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = sexo,
-                    onValueChange = { sexo = it },
-                    label = { Text("Sexo (M/F)") },
+
+                ExposedDropdownMenuBox(
+                    expanded = abierto,
+                    onExpandedChange = { abierto = !abierto },
                     modifier = Modifier.fillMaxWidth()
-                )
+                ) {
+                    OutlinedTextField(
+                        value = sexo,
+                        onValueChange = { /* readOnly */ },
+                        label = { Text("Sexo (M/F)") },
+                        readOnly = true,
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth(),
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = abierto) },
+                        isError = error?.contains("sexo", ignoreCase = true) == true
+                    )
+                    ExposedDropdownMenu(expanded = abierto, onDismissRequest = { abierto = false }) {
+                        opcionesSexo.forEach { opcion ->
+                            DropdownMenuItem(
+                                text = { Text(opcion) },
+                                onClick = {
+                                    sexo = opcion
+                                    abierto = false
+                                    validarYSetError()
+                                }
+                            )
+                        }
+                    }
+                }
+
+                if (!error.isNullOrBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(error!!, color = MaterialTheme.colorScheme.error)
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    val edadInt = edad.toIntOrNull() ?: 0
-                    if (nombre.isNotBlank() && edadInt > 0 && sexo.isNotBlank()) {
-                        val updated = dispositivo.copy(
-                            nombreHijo = nombre,
-                            edadHijo = edadInt,
-                            sexoHijo = sexo
+                    val edadInt = edadTexto.toIntOrNull() ?: 0
+                    val msg = validator(nombre, edadInt, sexo)
+                    if (msg == null) {
+                        onSave(
+                            dispositivo.copy(
+                                nombreHijo = nombre,
+                                edadHijo = edadInt,
+                                sexoHijo = sexo
+                            )
                         )
-                        onSave(updated)
+                    } else {
+                        error = msg
                     }
                 },
+                enabled = error == null,
                 colors = ButtonDefaults.buttonColors(containerColor = primaryLight)
             ) { Text("Guardar", color = Color.White) }
         },

@@ -240,7 +240,7 @@ class VistaModeloVinculacion(
             }
         }
     }
-    private fun validarNombreHijo(nombre: String): Boolean {
+     fun validarNombreHijo(nombre: String): Boolean {
         val n = normalizarNombreEntrada(nombre)
 
         // Debe haber al menos "nombre" y "apellido"
@@ -255,17 +255,29 @@ class VistaModeloVinculacion(
         return tieneNombreApellido && largoOk
     }
 
-    private fun validarEdadHijo(edad: Int): Boolean {
+     fun validarEdadHijo(edad: Int): Boolean {
         // La edad debe estar entre 1 y 17 años
         return edad in 1..17
     }
-    private fun validarSexoHijo(sexo: String): Boolean {
+     fun validarSexoHijo(sexo: String): Boolean {
         val s = sexo.trim().lowercase()
         return s == "m" || s == "f" || s == "masculino" || s == "femenino"
     }
     /** Normaliza el nombre: quita espacios a los extremos y colapsa espacios internos en uno */
-    private fun normalizarNombreEntrada(nombre: String): String =
+     fun normalizarNombreEntrada(nombre: String): String =
         nombre.trim().replace("\\s+".toRegex(), " ")
+    fun validarPerfil(nombre: String, edad: Int, sexo: String): String? {
+        if (!validarNombreHijo(nombre)) {
+            return "Escribe nombre y apellido (mín. $MIN_LETRAS_SIN_ESPACIOS letras en total)."
+        }
+        if (!validarEdadHijo(edad)) {
+            return "La edad del hijo debe estar entre 1 y 17 años."
+        }
+        if (!validarSexoHijo(sexo)) {
+            return "El sexo debe ser 'M' o 'F' (o masculino/femenino)."
+        }
+        return null // todo OK
+    }
 
 }
 
