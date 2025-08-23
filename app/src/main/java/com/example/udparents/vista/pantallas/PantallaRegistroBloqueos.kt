@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -79,22 +80,35 @@ fun PantallaRegistroBloqueos(
                 },
                 actions = {
                     if (registroBloqueos.isNotEmpty()) {
+                        // Ver PDF (como ya lo tenías)
                         IconButton(onClick = {
-                            // Acción del botón PDF
                             coroutineScope.launch {
                                 val nombreArchivo = "bloqueos_${hijoSeleccionado?.second ?: "hijo"}"
-                                // Generamos y abrimos el PDF directamente, no usamos una variable de estado
                                 PdfUtils.generarPdfDesdeComposable(
                                     context = context,
                                     activity = activity,
                                     fileName = nombreArchivo,
-                                    // Pasamos el Composable que queremos renderizar en el PDF
                                 ) {
                                     ReporteDeBloqueosPDF(registroBloqueos)
                                 }
                             }
                         }) {
                             Icon(Icons.Default.PictureAsPdf, contentDescription = "Ver PDF", tint = onPrimaryColor)
+                        }
+                        // Guardar/Compartir PDF en Descargas
+                        IconButton(onClick = {
+                            coroutineScope.launch {
+                                val nombre = "bloqueos_${hijoSeleccionado?.second ?: "hijo"}"
+                                val uri = PdfUtils.generarPdfDesdeComposableAStorage(
+                                    context = context,
+                                    activity = activity,
+                                    fileName = nombre
+                                ) { ReporteDeBloqueosPDF(registroBloqueos) }
+
+                                uri?.let { PdfUtils.compartirPdf(context, it) }
+                            }
+                        }) {
+                            Icon(Icons.Default.Download, contentDescription = "Guardar/Compartir", tint = onPrimaryColor)
                         }
                     }
                 },
@@ -155,7 +169,7 @@ private fun ReporteDeBloqueosPDF(bloqueos: List<BloqueoRegistro>) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
-            .background(Color.White) // Asegurar que el fondo del PDF sea blanco
+            .background(Color.White)
     ) {
         Text(
             text = "Informe de Bloqueos de Aplicaciones",

@@ -230,7 +230,8 @@ fun NavegacionApp() {
         }
         composable(Rutas.INFORME_APPS_MAS_USADAS) {
             PantallaInformeAppsMasUsadas(
-                onVolverAlMenuPadre = { navController.popBackStack() }
+                onVolverAlMenuPadre = { navController.popBackStack() },
+                activity = activity // Pasa el parámetro `activity` aquí
             )
         }
         // 💡 Composable corregido: ya no se pasa el navController

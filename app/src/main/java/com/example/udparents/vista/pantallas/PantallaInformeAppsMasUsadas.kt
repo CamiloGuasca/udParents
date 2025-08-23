@@ -1,5 +1,6 @@
 package com.example.udparents.vista.pantallas
 
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -7,22 +8,26 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.PhoneAndroid // Importación para el ícono de la app
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.udparents.utilidades.PdfUtils
 import com.example.udparents.viewmodel.VistaModeloApps
 import com.google.firebase.auth.FirebaseAuth
 import java.util.concurrent.TimeUnit
 import java.util.Date
 import java.util.Calendar
+import kotlinx.coroutines.launch // Importar coroutineScope.launch
 
 // =================================================================================================
 // PANTALLA PARA HU-013: Informe de Aplicaciones Más Usadas
@@ -32,43 +37,38 @@ import java.util.Calendar
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaInformeAppsMasUsadas(
-    onVolverAlMenuPadre: () -> Unit // callback para regresar
+    onVolverAlMenuPadre: () -> Unit,
+    activity: ComponentActivity
 ) {
     val viewModel: VistaModeloApps = viewModel()
     val hijosVinculados by viewModel.hijosVinculados.collectAsState()
     val usuario = FirebaseAuth.getInstance().currentUser
     val idPadre = usuario?.uid ?: ""
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope() // Obtener un coroutineScope
 
-    // Estado para el hijo seleccionado (UID y nombre)
     var hijoSeleccionado by remember {
         mutableStateOf<Pair<String, String>?>(null)
     }
 
-    // Llama a la función del ViewModel para cargar los hijos vinculados
     LaunchedEffect(Unit) {
         viewModel.cargarHijos(idPadre)
     }
 
-    // Se actualiza el hijo seleccionado si la lista de hijos vinculados no está vacía.
     LaunchedEffect(hijosVinculados) {
         if (hijosVinculados.isNotEmpty() && hijoSeleccionado == null) {
             hijoSeleccionado = hijosVinculados.first()
         }
     }
 
-    // Estados para la interfaz
     val appsMasUsadas by viewModel.appsMasUsadas.collectAsState()
-
-    // Estado para controlar el período de tiempo seleccionado
     var periodoSeleccionado by remember { mutableStateOf("Hoy") }
     val periodos = listOf("Hoy", "Últimos 7 días", "Últimos 30 días")
 
-    // Lógica para cargar los datos cuando cambien el hijo o el período
     LaunchedEffect(hijoSeleccionado, periodoSeleccionado) {
         hijoSeleccionado?.let { hijo ->
             val (desde, hasta) = when (periodoSeleccionado) {
                 "Hoy" -> {
-                    // Establece el rango para el día actual
                     val cal = Calendar.getInstance().apply {
                         set(Calendar.HOUR_OF_DAY, 0)
                         set(Calendar.MINUTE, 0)
@@ -80,7 +80,6 @@ fun PantallaInformeAppsMasUsadas(
                     desdeHoy to hastaHoy
                 }
                 "Últimos 7 días" -> {
-                    // Establece el rango para los últimos 7 días
                     val cal = Calendar.getInstance().apply {
                         add(Calendar.DAY_OF_YEAR, -7)
                         set(Calendar.HOUR_OF_DAY, 0)
@@ -93,7 +92,6 @@ fun PantallaInformeAppsMasUsadas(
                     desde7 to hasta7
                 }
                 "Últimos 30 días" -> {
-                    // Establece el rango para los últimos 30 días
                     val cal = Calendar.getInstance().apply {
                         add(Calendar.DAY_OF_YEAR, -30)
                         set(Calendar.HOUR_OF_DAY, 0)
@@ -114,8 +112,7 @@ fun PantallaInformeAppsMasUsadas(
         }
     }
 
-    // Paleta de colores ajustada con un fondo aún más oscuro
-    val primaryDark = Color(0xFF000033) // Azul medianoche muy oscuro para el fondo
+    val primaryDark = Color(0xFF000033)
     val primaryLight = Color(0xFF3F51B5)
     val accentColor = Color(0xFFCDDC39)
     val onPrimaryColor = Color.White
@@ -129,6 +126,45 @@ fun PantallaInformeAppsMasUsadas(
                 navigationIcon = {
                     IconButton(onClick = onVolverAlMenuPadre) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = onPrimaryColor)
+                    }
+                },
+                actions = {
+                    val apps = appsMasUsadas
+                    if (apps.isNotEmpty() && hijoSeleccionado != null) {
+                        IconButton(onClick = {
+                            coroutineScope.launch {
+                                val nombreArchivo = buildString {
+                                    append("apps_mas_usadas_")
+                                    append(hijoSeleccionado!!.second.replace(" ", "_").lowercase())
+                                    append("_")
+                                    append(
+                                        when (periodoSeleccionado) {
+                                            "Hoy" -> "hoy"
+                                            "Últimos 7 días" -> "ultimos_7_dias"
+                                            "Últimos 30 días" -> "ultimos_30_dias"
+                                            else -> "periodo"
+                                        }
+                                    )
+                                }
+                                PdfUtils.generarPdfDesdeComposable(
+                                    context = context,
+                                    activity = activity,
+                                    fileName = nombreArchivo
+                                ) {
+                                    ReporteAppsMasUsadasPDF(
+                                        nombreHijo = hijoSeleccionado!!.second,
+                                        periodoEtiqueta = periodoSeleccionado,
+                                        appsMasUsadas = apps
+                                    )
+                                }
+                            }
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.PictureAsPdf,
+                                contentDescription = "Exportar PDF",
+                                tint = onPrimaryColor
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -146,7 +182,6 @@ fun PantallaInformeAppsMasUsadas(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Dropdown para seleccionar el hijo
             if (hijosVinculados.isNotEmpty()) {
                 HijoSelectorInformeApps(
                     hijos = hijosVinculados,
@@ -158,7 +193,6 @@ fun PantallaInformeAppsMasUsadas(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            // Dropdown para filtrar por período de tiempo
             PeriodoSelectorInformeApps(
                 periodos = periodos,
                 periodoSeleccionado = periodoSeleccionado,
@@ -168,7 +202,6 @@ fun PantallaInformeAppsMasUsadas(
             )
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Lista de aplicaciones
             if (appsMasUsadas.isNotEmpty()) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -192,6 +225,44 @@ fun PantallaInformeAppsMasUsadas(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ReporteAppsMasUsadasPDF(
+    nombreHijo: String,
+    periodoEtiqueta: String,
+    appsMasUsadas: Map<String, Long>
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .background(Color.White)
+    ) {
+        Text(
+            text = "Informe de Aplicaciones Más Usadas",
+            style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.Black)
+        )
+        Spacer(Modifier.height(8.dp))
+        Text("Hijo: $nombreHijo", color = Color.Black)
+        Text("Periodo: $periodoEtiqueta", color = Color.Black)
+        Spacer(Modifier.height(16.dp))
+
+        appsMasUsadas.toList()
+            .sortedByDescending { it.second }
+            .forEachIndexed { index, (app, millis) ->
+                Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                    Text(
+                        text = "${index + 1}. $app",
+                        style = TextStyle(fontWeight = FontWeight.Bold, color = Color.Black)
+                    )
+                    Text(
+                        text = "Tiempo de uso: ${formatMillisToTime(millis)}",
+                        color = Color.Black
+                    )
+                }
+            }
     }
 }
 
@@ -338,7 +409,6 @@ private fun AppUsoItemInformeApps(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Se agrega un ícono de aplicación genérico para representar la app
             Box(
                 modifier = Modifier
                     .size(48.dp)
@@ -346,7 +416,7 @@ private fun AppUsoItemInformeApps(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.PhoneAndroid, // Ícono genérico de Android
+                    imageVector = Icons.Default.PhoneAndroid,
                     contentDescription = "App Icon",
                     tint = Color.DarkGray,
                     modifier = Modifier.size(32.dp)

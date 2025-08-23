@@ -16,41 +16,31 @@ import android.provider.MediaStore
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.annotation.RequiresApi
+import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileOutputStream
 import kotlinx.coroutines.CompletableDeferred
 import java.io.OutputStream
+import android.util.Log
 
-/**
- * Clase de utilidades para generar y guardar PDFs a partir de Composable.
- */
 object PdfUtils {
 
     /**
-     * Genera un archivo PDF a partir de un Composable.
-     * La vista se renderiza temporalmente en la actividad para evitar el error de windowRecomposer.
-     * Luego se guarda y se abre el PDF con una aplicación externa.
-     *
-     * @param context El contexto de la aplicación.
-     * @param activity La actividad actual, necesaria para la jerarquía de vistas y permisos.
-     * @param fileName El nombre del archivo PDF a crear (sin la extensión .pdf).
-     * @param contenido El Composable que se va a renderizar en el PDF.
+     * Genera un PDF desde un Composable y lo abre en un visor de PDF.
      */
     suspend fun generarPdfDesdeComposable(
         context: Context,
-        activity: Activity,
+        activity: ComponentActivity,
         fileName: String,
-        contenido: @Composable () -> Unit
+        content: @Composable () -> Unit
     ) {
-        // En Android 13 (TIRAMISU) y superiores, este permiso ya no es necesario para el almacenamiento privado de la app.
-        // Sin embargo, para versiones anteriores, es requerido para el almacenamiento público.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU &&
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE)
             != PackageManager.PERMISSION_GRANTED
         ) {
@@ -61,123 +51,215 @@ object PdfUtils {
             )
             return
         }
-
-        val deferredBitmap = CompletableDeferred<Bitmap>()
-
+        val deferredUri = CompletableDeferred<Uri?>()
         val composeView = ComposeView(context).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
-                contenido()
-            }
+            setContent { content() }
         }
 
         val rootView = activity.findViewById<View>(android.R.id.content) as ViewGroup
         rootView.addView(composeView)
 
-        composeView.post {
+        // Inicializamos fuera del try para que sean accesibles en finally
+        var document: PdfDocument? = null
+        var out: OutputStream? = null
+
+        composeView.post { // Usa composeView.post para asegurar que la vista esté medida y dibujada
             try {
                 composeView.measure(
-                    View.MeasureSpec.makeMeasureSpec(rootView.width, View.MeasureSpec.EXACTLY),
-                    View.MeasureSpec.makeMeasureSpec(rootView.height, View.MeasureSpec.EXACTLY)
+                    View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
                 )
                 composeView.layout(0, 0, composeView.measuredWidth, composeView.measuredHeight)
 
-                val bitmap = capturarBitmapDesdeVista(composeView)
-                deferredBitmap.complete(bitmap)
+                document = PdfDocument()
+                val pageInfo = PdfDocument.PageInfo.Builder(
+                    composeView.measuredWidth,
+                    composeView.measuredHeight,
+                    1
+                ).create()
+                val page = document!!.startPage(pageInfo) // Usar !! después de inicializar
+                composeView.draw(page.canvas)
+                document!!.finishPage(page) // Usar !! después de inicializar
 
+                val safeName = if (fileName.endsWith(".pdf", true)) fileName else "$fileName.pdf"
+
+                var uri: Uri? = null
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Downloads.DISPLAY_NAME, safeName)
+                        put(MediaStore.Downloads.MIME_TYPE, "application/pdf")
+                        put(MediaStore.Downloads.IS_PENDING, 1)
+                    }
+                    val resolver = context.contentResolver
+                    uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                    out = uri?.let { resolver.openOutputStream(it) }
+
+                    if (out == null) throw IllegalStateException("No se pudo abrir OutputStream")
+
+                    document!!.writeTo(out!!) // Usar !!
+                    out!!.flush() // Usar !!
+
+                    values.clear()
+                    values.put(MediaStore.Downloads.IS_PENDING, 0)
+                    uri?.let { resolver.update(it, values, null, null) } // Usar ?.let para Uri
+                } else {
+                    val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                    if (!downloads.exists()) downloads.mkdirs()
+                    val file = File(downloads, safeName)
+                    out = FileOutputStream(file)
+                    document!!.writeTo(out!!) // Usar !!
+                    out!!.flush() // Usar !!
+                    uri = FileProvider.getUriForFile(
+                        context,
+                        context.packageName + ".provider", // Corregido: .provider
+                        file
+                    )
+                }
+                deferredUri.complete(uri)
+            } catch (t: Throwable) {
+                Log.e("PdfUtils", "Error al generar el PDF: ${t.message}", t)
+                deferredUri.complete(null)
+            } finally {
+                try {
+                    rootView.removeView(composeView)
+                    out?.close()
+                    document?.close() // Cierra el documento si se inicializó
+                } catch (_: Throwable) {}
+            }
+        }
+        val pdfUri = deferredUri.await()
+        pdfUri?.let {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(pdfUri, "application/pdf")
+                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+            }
+            try {
+                context.startActivity(intent)
             } catch (e: Exception) {
-                deferredBitmap.completeExceptionally(e)
+                Toast.makeText(context, "No se encontró un visor de PDF.", Toast.LENGTH_SHORT).show()
+            }
+        } ?: Toast.makeText(context, "Error al generar o abrir el PDF.", Toast.LENGTH_SHORT).show()
+    }
+
+    /**
+     * NUEVO: Genera PDF desde un Composable y lo guarda en "Descargas".
+     * Devuelve el Uri del archivo o null si falló.
+     */
+    suspend fun generarPdfDesdeComposableAStorage(
+        context: Context,
+        activity: ComponentActivity,
+        fileName: String,
+        content: @Composable () -> Unit
+    ): Uri? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                activity,
+                arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                101
+            )
+            return null
+        }
+        val deferredUri = CompletableDeferred<Uri?>()
+        val composeView = ComposeView(context).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent { content() }
+        }
+
+        val rootView = activity.findViewById<View>(android.R.id.content) as ViewGroup
+        rootView.addView(composeView)
+
+        // Inicializamos fuera del try para que sean accesibles en finally
+        var document: PdfDocument? = null
+        var out: OutputStream? = null
+
+        composeView.post { // Usa composeView.post para asegurar que la vista esté medida y dibujada
+            try {
+                composeView.measure(
+                    View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+                )
+                composeView.layout(0, 0, composeView.measuredWidth, composeView.measuredHeight)
+
+                document = PdfDocument()
+                val pageInfo = PdfDocument.PageInfo.Builder(
+                    composeView.measuredWidth,
+                    composeView.measuredHeight,
+                    1
+                ).create()
+                val page = document!!.startPage(pageInfo)
+                composeView.draw(page.canvas)
+                document!!.finishPage(page)
+
+                val safeName = if (fileName.endsWith(".pdf", true)) fileName else "$fileName.pdf"
+
+                var uri: Uri? = null
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val values = ContentValues().apply {
+                            put(MediaStore.Downloads.DISPLAY_NAME, safeName)
+                            put(MediaStore.Downloads.MIME_TYPE, "application/pdf")
+                            put(MediaStore.Downloads.IS_PENDING, 1)
+                        }
+                        val resolver = context.contentResolver
+                        uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                        out = uri?.let { resolver.openOutputStream(it) }
+                        if (out == null) throw IllegalStateException("No se pudo abrir OutputStream")
+
+                        document!!.writeTo(out!!)
+                        out!!.flush()
+
+                        values.clear()
+                        values.put(MediaStore.Downloads.IS_PENDING, 0)
+                        uri?.let { resolver.update(it, values, null, null) } // Usar ?.let
+                    } else {
+                        val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                        if (!downloads.exists()) downloads.mkdirs()
+                        val file = File(downloads, safeName)
+                        out = FileOutputStream(file)
+                        document!!.writeTo(out!!)
+                        out!!.flush()
+                        uri = FileProvider.getUriForFile(
+                            context,
+                            context.packageName + ".provider", // Corregido: .provider
+                            file
+                        )
+                    }
+                    deferredUri.complete(uri)
+                } catch (t: Throwable) {
+                    Log.e("PdfUtils", "Error al generar y guardar PDF: ${t.message}", t)
+                    deferredUri.complete(null)
+                } finally {
+                    try { out?.close() } catch (_: Throwable) {}
+                    document?.close() // Cierra el documento si se inicializó
+                }
+            } catch (t: Throwable) {
+                Log.e("PdfUtils", "Error general al generar el PDF: ${t.message}", t)
+                deferredUri.complete(null)
             } finally {
                 rootView.removeView(composeView)
             }
         }
-
-        try {
-            val bitmap = deferredBitmap.await()
-            guardarBitmapComoPDF(context, bitmap, fileName)
-        } catch (e: Exception) {
-            Toast.makeText(context, "Error al generar el PDF: ${e.message}", Toast.LENGTH_LONG).show()
-        }
+        return deferredUri.await()
     }
 
     /**
-     * Captura una vista Composable en un Bitmap.
-     * @param view La vista Composable que se va a capturar.
-     * @return El Bitmap resultante de la captura.
+     * NUEVO: Compartir un PDF mediante ACTION_SEND.
      */
-    private fun capturarBitmapDesdeVista(view: View): Bitmap {
-        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        view.draw(canvas)
-        return bitmap
-    }
-
-    /**
-     * Guarda un Bitmap como un archivo PDF en la carpeta de Descargas pública
-     * y luego lo abre con un Intent.
-     *
-     * @param context El contexto de la aplicación.
-     * @param bitmap El Bitmap a guardar en el PDF.
-     * @param fileName El nombre del archivo PDF.
-     */
-    @RequiresApi(Build.VERSION_CODES.Q)
-    private fun guardarBitmapComoPDF(
-        context: Context,
-        bitmap: Bitmap,
-        fileName: String
-    ) {
-        val pdfDocument = PdfDocument()
-        val pageInfo = PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, 1).create()
-        val page = pdfDocument.startPage(pageInfo)
-        page.canvas.drawBitmap(bitmap, 0f, 0f, null)
-        pdfDocument.finishPage(page)
-
-        val finalFileName = "$fileName.pdf"
-
-        // 💡 Uso de MediaStore para guardar en la carpeta de Descargas pública.
-        val contentResolver = context.contentResolver
-        val contentValues = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, finalFileName)
-            put(MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-            }
+    fun compartirPdf(context: Context, uri: Uri) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-
-        var outputStream: OutputStream? = null
-        var pdfUri: Uri? = null
-
-        try {
-            pdfUri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
-            if (pdfUri == null) {
-                throw Exception("No se pudo crear la URI para el PDF.")
-            }
-
-            outputStream = contentResolver.openOutputStream(pdfUri)
-            if (outputStream == null) {
-                throw Exception("No se pudo obtener el OutputStream.")
-            }
-
-            pdfDocument.writeTo(outputStream)
-            pdfDocument.close()
-
-            Toast.makeText(context, "PDF guardado en la carpeta Descargas", Toast.LENGTH_LONG).show()
-
-            // Abrir el PDF con un Intent para que el usuario pueda verlo inmediatamente
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(pdfUri, "application/pdf")
-                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NO_HISTORY
-            }
-            context.startActivity(intent)
-
-        } catch (e: Exception) {
-            Toast.makeText(context, "Error al guardar el PDF: ${e.message}", Toast.LENGTH_LONG).show()
-        } finally {
-            outputStream?.close()
-        }
+        context.startActivity(Intent.createChooser(intent, "Compartir PDF"))
     }
 }
