@@ -97,7 +97,7 @@ class PantallaBloqueoComposeActivity : ComponentActivity() {
                     }
 
                 } else {
-                    // Bloqueo normal (límite/horario/app): usa TU PantallaBloqueoApp existente
+                    // Bloqueo normal (límite/horario/app): usamos PantallaBloqueoApp existente
                     PantallaBloqueoApp(
                         nombreApp = nombreApp,
                         motivoBloqueo = motivoBloqueo
@@ -159,7 +159,7 @@ class PantallaBloqueoComposeActivity : ComponentActivity() {
         return dpm?.isAdminActive(cn) == true
     }
 
-    /** Abre la pantalla del sistema para activar el Admin de dispositivo, con fallbacks */
+    /** Abre la pantalla del sistema para activar el Admin de dispositivo, con ´Pasos 1-2-3 */
     private fun solicitarActivacionDeviceAdmin() {
         val dpm = getSystemService(DevicePolicyManager::class.java)
         val cn = ComponentName(this, AdminReceiver::class.java)
@@ -176,7 +176,7 @@ class PantallaBloqueoComposeActivity : ComponentActivity() {
                 DevicePolicyManager.EXTRA_ADD_EXPLANATION,
                 "UdParents necesita este permiso para impedir que se desinstale sin autorización."
             )
-            // (Sin FLAG_ACTIVITY_NEW_TASK porque ya estamos en una Activity)
+
         }
 
         try {
@@ -189,7 +189,7 @@ class PantallaBloqueoComposeActivity : ComponentActivity() {
             Log.w("BloqueoPermiso", "No hay actividad para ACTION_ADD_DEVICE_ADMIN: ${e.message}")
         }
 
-        // Fallback 1: pantalla específica de administradores de dispositivo (algunos OEMs)
+        //  1: pantalla específica de administradores de dispositivo (algunos OEMs)
         val adminSettings = Intent("android.settings.ACTION_DEVICE_ADMIN_SETTINGS")
         if (adminSettings.resolveActivity(packageManager) != null) {
             Log.d("BloqueoPermiso", "Fallback → ACTION_DEVICE_ADMIN_SETTINGS")
@@ -198,7 +198,7 @@ class PantallaBloqueoComposeActivity : ComponentActivity() {
             return
         }
 
-        // Fallback 2: Seguridad
+        //  2: Seguridad
         val security = Intent(Settings.ACTION_SECURITY_SETTINGS)
         if (security.resolveActivity(packageManager) != null) {
             Log.d("BloqueoPermiso", "Fallback → ACTION_SECURITY_SETTINGS")
@@ -207,7 +207,7 @@ class PantallaBloqueoComposeActivity : ComponentActivity() {
             return
         }
 
-        // Fallback 3: Ajustes generales
+        //  3: Ajustes generales
         val settings = Intent(Settings.ACTION_SETTINGS)
         if (settings.resolveActivity(packageManager) != null) {
             Log.d("BloqueoPermiso", "Fallback → ACTION_SETTINGS")

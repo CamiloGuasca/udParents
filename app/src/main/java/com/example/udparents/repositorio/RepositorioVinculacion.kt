@@ -49,7 +49,7 @@ class RepositorioVinculacion {
     }
 
     /**
-     * 💡 NUEVA FUNCIÓN AÑADIDA: Obtiene un objeto CodigoVinculacion completo a partir de su código.
+     *  NUEVA FUNCIÓN AÑADIDA: Obtiene un objeto CodigoVinculacion completo a partir de su código.
      * Esta función es necesaria para obtener el UID del padre.
      */
     suspend fun obtenerCodigoPorID(codigo: String): CodigoVinculacion? {
@@ -86,7 +86,7 @@ class RepositorioVinculacion {
             "termsVersion" to codigoVinculacion.termsVersion,
             "termsAcceptedAt" to (codigoVinculacion.termsAcceptedAt ?: System.currentTimeMillis()),
 
-            // (opcional) útil para auditoría
+            //  útil para auditoría
             "timestampVinculacion" to System.currentTimeMillis()
         )
 
@@ -108,7 +108,6 @@ class RepositorioVinculacion {
         dispositivo: CodigoVinculacion,
         onResult: (Boolean) -> Unit
     ) {
-        // En Firestore, el documento del hijo está bajo el código de vinculación.
         // Se actualizan solo los campos que pueden ser editados.
         coleccionCodigos
             .document(dispositivo.codigo)

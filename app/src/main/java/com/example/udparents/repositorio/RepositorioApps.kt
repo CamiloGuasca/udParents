@@ -17,7 +17,7 @@ class RepositorioApps {
     private val db = FirebaseFirestore.getInstance()
     private val TAG = "RepositorioApps"
 
-    // *** Función existente: registrarUsoAplicacion (se mantiene igual para el barrido de 30s) ***
+    // *** Función existente: registrarUsoAplicacion (barrido de 30s) ***
     suspend fun registrarUsoAplicacion(uidHijo: String, appUso: AppUso) {
         val clave = "${appUso.nombrePaquete}_${formatearFecha(appUso.fechaUso)}"
         val docRef = db.collection("hijos").document(uidHijo)
@@ -25,7 +25,7 @@ class RepositorioApps {
 
         try {
             // Usa merge para solo actualizar los campos proporcionados, el tiempoUso ya viene acumulado.
-            docRef.set(appUso, SetOptions.merge()).await() // Añadir .await() para asegurar que la operación se complete
+            docRef.set(appUso, SetOptions.merge()).await() // .await() para asegurar que la operación se complete
             Log.d(TAG, "✅ Uso de app registrado/actualizado: ${appUso.nombreApp} (${appUso.tiempoUso} ms) para ${uidHijo}")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error al registrar uso de app ${appUso.nombrePaquete}: ${e.message}", e)
@@ -62,7 +62,7 @@ class RepositorioApps {
                     fechaUso = calendar.timeInMillis,
                     tiempoUso = incrementBy
                 )
-                // Usamos SetOptions.merge() para crear el documento o fusionarlo si ya existe con otros campos
+                //  SetOptions.merge() para crear el documento o fusionarlo si ya existe con otros campos
                 docRef.set(appUsoInicial, SetOptions.merge()).await()
                 Log.d(TAG, "➕ Documento de uso para $packageName creado con $incrementBy ms.")
             }
@@ -70,8 +70,6 @@ class RepositorioApps {
             Log.e(TAG, "❌ Error inesperado al incrementar/crear uso de $packageName: ${e.message}", e)
         }
     }
-
-    // Las demás funciones se mantienen sin cambios
 
     suspend fun guardarRestriccionHorario(uidHijo: String, restriccion: RestriccionHorario) {
         val docRef = db.collection("hijos").document(uidHijo)
@@ -216,7 +214,7 @@ class RepositorioApps {
             val datos = mapOf("bloqueada" to bloquear)
             ref.set(datos).await()
         } catch (e: Exception) {
-            e.printStackTrace() // Puedes manejar esto con logs o mostrar error en UI
+            e.printStackTrace() //  manejar esto con logs o mostrar error en UI
         }
     }
 
@@ -270,7 +268,6 @@ class RepositorioApps {
             val snapshot = db.collection("hijos").document(uidHijo)
                 .collection("uso_apps")
                 // Filtra solo los documentos de la última semana.
-                // Esta es la parte que causa problemas. Ahora lo corregiremos para que obtenga todos los usos de esa semana y los procese.
                 .whereGreaterThanOrEqualTo("fechaUso", inicioSemana)
                 .get()
                 .await()

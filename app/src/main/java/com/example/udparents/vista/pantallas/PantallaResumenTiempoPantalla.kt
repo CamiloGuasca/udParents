@@ -26,12 +26,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.udparents.viewmodel.VistaModeloApps
 import com.google.firebase.auth.FirebaseAuth
 import java.util.concurrent.TimeUnit
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.AnnotatedString
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.Calendar
 
 // =================================================================================================
 // NUEVA PANTALLA PARA HU-012: Resumen de Tiempo de Pantalla
@@ -89,6 +89,20 @@ fun PantallaResumenTiempoPantalla(
     val onPrimaryColor = Color.White
     val surfaceColor = Color(0xFF2C387F)
     val onSurfaceColor = Color(0xFFE8EAF6)
+
+    val tiempoTotalDiario = remember { mutableStateOf(0L) }
+    val tiempoTotalSemanal = remember { mutableStateOf(0L) }
+
+    // CORRECCIÓN: Calcular totales correctos (HOY y ÚLTIMOS 7 DÍAS)
+    LaunchedEffect(tiempoDiario) {
+        // Diario: solo la clave del día de hoy
+        val hoy = hoyKey()
+        tiempoTotalDiario.value = tiempoDiario[hoy] ?: 0L
+
+        // Semanal: suma de los últimos 7 días (incluye hoy) usando el mapa diario
+        val ult7 = filtrarUltimosNDias(tiempoDiario, 7)
+        tiempoTotalSemanal.value = ult7.values.sum()
+    }
 
     Scaffold(
         topBar = {
@@ -153,16 +167,11 @@ fun PantallaResumenTiempoPantalla(
             // =================================================================================================
             if (hijoSeleccionado != null) {
                 // Calcular el tiempo total del día o de la semana
-                val tiempoTotalMillis = if (vistaSeleccionada == "Diaria") {
-                    // Sumar todos los valores del mapa del tiempo diario
-                    tiempoDiario.values.sum()
+                val tiempoTotalFormateado = if (vistaSeleccionada == "Diaria") {
+                    formatMillisToTime(tiempoTotalDiario.value)
                 } else {
-                    // Sumar todos los valores del mapa del tiempo semanal
-                    tiempoSemanal.values.sum()
+                    formatMillisToTime(tiempoTotalSemanal.value)
                 }
-
-                // Formatear el tiempo total a un formato legible
-                val tiempoTotalFormateado = formatMillisToTime(tiempoTotalMillis)
 
                 // Mostrar el mensaje de tiempo total
                 Text(
@@ -174,8 +183,9 @@ fun PantallaResumenTiempoPantalla(
                 )
 
                 if (vistaSeleccionada == "Diaria") {
+                    val ultimos7Dias = filtrarUltimosNDias(tiempoDiario, 7)
                     GraficoDeBarras(
-                        data = tiempoDiario,
+                        data = ultimos7Dias,
                         titulo = "Uso Diario",
                         barColor = accentColor,
                         labelColor = onSurfaceColor,
@@ -229,8 +239,8 @@ fun HijoSelector(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = surfaceColor,
                 unfocusedContainerColor = surfaceColor,
-                focusedTextColor = Color.Black, // Color de texto oscuro para que se vea
-                unfocusedTextColor = Color.Black, // Color de texto oscuro para que se vea
+                focusedTextColor = onSurfaceColor,
+                unfocusedTextColor = onSurfaceColor,
                 focusedBorderColor = onSurfaceColor,
                 unfocusedBorderColor = onSurfaceColor,
             )
@@ -276,7 +286,20 @@ fun GraficoDeBarras(
     axisColor: Color
 ) {
     val textMeasurer = rememberTextMeasurer()
-    val sortedData = data.toList().sortedBy { it.first }
+    val sortedData = if (titulo == "Uso Diario") {
+        // Las claves vienen como "yyyy-MM-dd": el orden lexicográfico ya funciona bien.
+        data.toList().sortedBy { it.first }
+    } else {
+        // Semanal: si las claves son números de semana ("1","2","10"...), ordénalas como enteros.
+        // Si vinieran como "2024-W35", extraemos el número "35" y ordenamos por él.
+        data.toList().sortedBy { kv ->
+            val k = kv.first
+            k.toIntOrNull()
+                ?: Regex("""\d+""").find(k)?.value?.toIntOrNull()
+                ?: Int.MAX_VALUE
+        }
+    }
+
     val maxTiempo = sortedData.maxOfOrNull { it.second } ?: 0L
     val dataSize = sortedData.size
 
@@ -371,9 +394,12 @@ fun GraficoDeBarras(
                     // Dibuja la etiqueta del eje X (Día de la semana)
                     val etiqueta = when (titulo) {
                         "Uso Diario" -> {
-                            // Extrae el día de la semana para una mejor visualización
-                            val fecha = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(label)
-                            SimpleDateFormat("EEE", Locale.getDefault()).format(fecha).substring(0, 3)
+                            try {
+                                val fecha = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(label)
+                                SimpleDateFormat("EEE", Locale.getDefault()).format(fecha ?: Date()).substring(0, 3)
+                            } catch (_: Throwable) {
+                                label // fallback
+                            }
                         }
                         else -> {
                             // Muestra el número de la semana para la vista semanal.
@@ -408,4 +434,38 @@ private fun formatMillisToTime(millis: Long): String {
         minutes > 0 -> "${minutes}m"
         else -> "1m"
     }
+}
+
+
+private fun hoyKey(): String {
+    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    return sdf.format(Date())
+}
+
+private fun keysUltimosNDias(n: Int): List<String> {
+    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val cal = Calendar.getInstance()
+    // normalizamos a inicio del día
+    cal.set(Calendar.HOUR_OF_DAY, 0)
+    cal.set(Calendar.MINUTE, 0)
+    cal.set(Calendar.SECOND, 0)
+    cal.set(Calendar.MILLISECOND, 0)
+
+    val keys = mutableListOf<String>()
+    for (i in 0 until n) {
+        val key = sdf.format(cal.time)
+        keys.add(key)
+        cal.add(Calendar.DAY_OF_YEAR, -1)
+    }
+    // devuelve de más antiguo → más reciente (opcional)
+    return keys.reversed()
+}
+
+/** Devuelve un mapa con SOLO los últimos N días (rellenando con 0 si falta algún día). */
+private fun filtrarUltimosNDias(
+    data: Map<String, Long>,
+    n: Int
+): Map<String, Long> {
+    val keys = keysUltimosNDias(n)
+    return keys.associateWith { k -> data[k] ?: 0L }
 }

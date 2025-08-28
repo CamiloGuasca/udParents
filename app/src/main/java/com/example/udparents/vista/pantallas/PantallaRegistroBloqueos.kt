@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -80,7 +81,7 @@ fun PantallaRegistroBloqueos(
                 },
                 actions = {
                     if (registroBloqueos.isNotEmpty()) {
-                        // Ver PDF (como ya lo tenías)
+                        // Ver PDF
                         IconButton(onClick = {
                             coroutineScope.launch {
                                 val nombreArchivo = "bloqueos_${hijoSeleccionado?.second ?: "hijo"}"
@@ -108,7 +109,7 @@ fun PantallaRegistroBloqueos(
                                 uri?.let { PdfUtils.compartirPdf(context, it) }
                             }
                         }) {
-                            Icon(Icons.Default.Download, contentDescription = "Guardar/Compartir", tint = onPrimaryColor)
+                            Icon(Icons.Default.Share, contentDescription = "Guardar/Compartir", tint = onPrimaryColor)
                         }
                     }
                 },

@@ -1,4 +1,3 @@
-// Archivo: com.example.udparents.vista.pantallas.PantallaVinculacionHijo.kt
 package com.example.udparents.vista.pantallas
 
 import android.app.Activity
@@ -462,9 +461,6 @@ Al seleccionar “Acepto”, confirmas que eres el acudiente del menor y que aut
         }
     }
 }
-
-// Resto de tus funciones auxiliares (verificarPermisoUsoApps, etc.)
-// Estas funciones no necesitan ser modificadas.
 
 private fun ocultarTodosLosDialogos(
     setUso: (Boolean) -> Unit,

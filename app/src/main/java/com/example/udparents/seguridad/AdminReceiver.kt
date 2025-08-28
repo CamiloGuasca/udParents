@@ -42,7 +42,6 @@ class AdminReceiver : DeviceAdminReceiver() {
         scope.launch {
             try {
                 sender.enviarNotificacionAlPadre(uidPadre, titulo, mensaje)
-                // deja un rastro en Firestore (opcional)
                 val repo = RepositorioBloqueos()
                 repo.registrarBloqueo(
                     uidHijo, uidPadre, BloqueoRegistro(

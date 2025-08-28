@@ -52,12 +52,12 @@ fun PantallaDispositivosVinculados(
         }
     }
 
-    // Paleta de colores más moderna y coherente
+    // Paleta de colores
     val primaryDark = Color(0xFF1A237E)
     val primaryLight = Color(0xFF3F51B5)
     val accentColor = Color(0xFFCDDC39)
     val onPrimaryColor = Color.White
-    val surfaceColor = Color(0xFF3949AB) // Un azul más oscuro para las tarjetas
+    val surfaceColor = Color(0xFF3949AB)
     val onSurfaceColor = Color(0xFFE8EAF6)
 
     Scaffold(

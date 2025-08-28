@@ -21,10 +21,10 @@ import androidx.compose.ui.unit.dp
 fun PantallaSeleccionHijo(
     titulo: String,
     listaHijos: List<Pair<String, String>>,
-    onHijoSeleccionado: (String, String) -> Unit, // Ahora pasamos el UID y el nombre
+    onHijoSeleccionado: (String, String) -> Unit, // Se pasa el UID y el nombre
     onVolver: () -> Unit
 ) {
-    // --- PALETA DE COLORES (Coherente con las otras pantallas) ---
+    // --- PALETA DE COLORES  ---
     val primaryDark = Color(0xFF1A237E)
     val primaryLight = Color(0xFF3F51B5)
     val accentColor = Color(0xFFCDDC39)

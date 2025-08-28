@@ -8,12 +8,12 @@ import kotlinx.coroutines.tasks.await
 
 /**
  * Clase para enviar notificaciones a través de una Cloud Function de Firebase.
- * Esta clase debe ser usada en la aplicación del hijo.
+ * Esta clase debe se usa en la aplicación del hijo.
  */
 class NotificacionSender {
 
     private val TAG = "NotificacionSender"
-    // CORRECCIÓN: Usamos la región 'us-central1'
+    //  Usamos la región 'us-central1'
     private val functions = Firebase.functions("us-central1")
 
     /**
@@ -33,8 +33,7 @@ class NotificacionSender {
 
         if (uidPadre.isEmpty() || titulo.isEmpty() || mensaje.isEmpty()) {
             Log.e(TAG, "❌ ERROR: Se detectó un valor vacío antes de la llamada a la Cloud Function.")
-            // Aquí puedes lanzar una excepción o manejar el error si lo deseas.
-            // No se procederá con la llamada.
+
             return
         }
 
@@ -48,7 +47,7 @@ class NotificacionSender {
         Log.d(TAG, "✅ Payload preparado correctamente. Enviando a Cloud Function...")
 
         try {
-            // Llama a la Cloud Function que creaste.
+            // Llama a la Cloud Function que se creo para esto.
             // La función se llama "enviarNotificacionAlPadre".
             val result = functions
                 .getHttpsCallable("enviarNotificacionAlPadre")

@@ -105,12 +105,12 @@ class VistaModeloVinculacion(
 
     /**
      * 💡 Esta función se ha actualizado para obtener el UID del padre usando
-     * la nueva función del repositorio.
+     *  función del repositorio.
      * @param onExito Callback que ahora recibe el UID del padre como String.
      */
     fun vincularHijoConDatos(
         context: Context,
-        onExito: (String) -> Unit, // 💡 Ahora onExito recibe el UID del padre
+        onExito: (String) -> Unit, //  recibe el UID del padre
         onError: (String) -> Unit
     ) {
         viewModelScope.launch {
@@ -188,10 +188,7 @@ class VistaModeloVinculacion(
             _codigoVinculacion.value = _codigoVinculacion.value.copy(dispositivoHijo = it)
         }
     }
-    // =================================================================================================
-    // NUEVAS FUNCIONES PARA LA HU-011: Gestión de perfiles
-    // =================================================================================================
-
+   //HU 11
     /**
      * Actualiza la información de un perfil de hijo vinculado.
      * @param uidPadre El UID del padre.
@@ -249,21 +246,19 @@ class VistaModeloVinculacion(
                 partes[0].length >= 2 &&
                 partes[1].length >= 2
 
-        // Mínimo de letras (sin contar espacios)
-        val largoOk = n.replace(" ", "").length >= MIN_LETRAS_SIN_ESPACIOS
+         val largoOk = n.replace(" ", "").length >= MIN_LETRAS_SIN_ESPACIOS
 
         return tieneNombreApellido && largoOk
     }
 
      fun validarEdadHijo(edad: Int): Boolean {
-        // La edad debe estar entre 1 y 17 años
         return edad in 1..17
     }
      fun validarSexoHijo(sexo: String): Boolean {
         val s = sexo.trim().lowercase()
         return s == "m" || s == "f" || s == "masculino" || s == "femenino"
     }
-    /** Normaliza el nombre: quita espacios a los extremos y colapsa espacios internos en uno */
+    /** se  normakliza el nombre: quita espacios a los extremos y  espacios internos en uno */
      fun normalizarNombreEntrada(nombre: String): String =
         nombre.trim().replace("\\s+".toRegex(), " ")
     fun validarPerfil(nombre: String, edad: Int, sexo: String): String? {

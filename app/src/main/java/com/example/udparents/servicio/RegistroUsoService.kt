@@ -128,7 +128,7 @@ class RegistroUsoService : Service() {
         val repositorio = RepositorioApps()
         val nombreAppActual = obtenerNombreApp(context, paqueteActual)
 
-        // ✅ CALCULAR EL TIEMPO TRANSCURRIDO REAL
+        // CALCULAR EL TIEMPO TRANSCURRIDO REAL
         val now = System.currentTimeMillis()
         val timeElapsed = if (lastCheckTime == 0L) 0L else now - lastCheckTime
         lastCheckTime = now
@@ -407,7 +407,6 @@ class RegistroUsoService : Service() {
     }
     /** Devuelve el componente completo del servicio de accesibilidad registrado */
     private fun componenteServicioAccesibilidad(): String {
-        // Ajusta SI TU nombre de clase cambia:
         val serviceClass = "com.example.udparents.servicio.BloqueoAccessibilityService"
         return "$packageName/$serviceClass"
     }
@@ -547,12 +546,10 @@ class RegistroUsoService : Service() {
             .setAutoCancel(true)
             .setFullScreenIntent(fullScreenPi, true)                    // clave
             .build()
-
-        // Publica la notificación; en muchos dispositivos abre la Activity de inmediato
         nm.notify(1002, notif)
 
-        // ⚠️ Fallback opcional:
-        // En algunos OEMs, si el sistema no abre full-screen por sí solo, intentamos abrir directo
+        //  Fallback opcional:
+        //  si el sistema no abre full-screen por sí solo, intentamos abrir directo
         // (Android < 10 lo permite; en >= 10 puede ser bloqueado por BAL).
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             try {
@@ -583,7 +580,6 @@ class RegistroUsoService : Service() {
             }
         }
 
-        // (Opcional) registrar el evento en Firestore para historial
         val uidHijo = FirebaseAuth.getInstance().currentUser?.uid
         if (!uidPadre.isBlank() && !uidHijo.isNullOrBlank()) {
             val repoBloqueos = RepositorioBloqueos()
@@ -603,7 +599,7 @@ class RegistroUsoService : Service() {
             }
         }
     }
-    // --- Helpers Device Admin: comprobar y solicitar activación ---
+    //  Helpers Device Admin: comprobar y solicitar activación
 
     private fun isDeviceAdminActive(context: Context): Boolean {
         val dpm = context.getSystemService(DevicePolicyManager::class.java)

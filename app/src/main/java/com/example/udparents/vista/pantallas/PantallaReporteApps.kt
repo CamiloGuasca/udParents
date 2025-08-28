@@ -82,7 +82,7 @@ fun PantallaReporteApps(
     var expandedHijos by remember { mutableStateOf(false) }
     var hijoSeleccionado by remember { mutableStateOf<Pair<String, String>?>(null) }
 
-    var mostrarFicha by remember { mutableStateOf(true) } // Mostrar ficha por defecto
+    var mostrarFicha by remember { mutableStateOf(true) } // SEmuestra ficha por defecto
 
     fun mostrarSelectorFecha(
         context: Context,
@@ -114,7 +114,7 @@ fun PantallaReporteApps(
         ).show()
     }
 
-    // --- NUEVA PALETA DE COLORES PARA MEJOR CONTRASTE ---
+    // --- NUEVA PALETA DE COLORES  ---
     val primaryDark = Color(0xFF000033) // Azul oscuro muy profundo (fondo principal)
     val primaryLight = Color(0xFF3F51B5) // Azul primario para TopAppBar, botón principal
     val accentColor = Color(0xFFCDDC39) // Verde lima vibrante para botones de acción y texto destacado
@@ -301,7 +301,7 @@ fun PantallaReporteApps(
 
                 Spacer(Modifier.height(16.dp))
 
-                // Lista de usos de aplicaciones (Ficha Técnica mejorada)
+                // Lista de usos de aplicaciones (Ficha Técnica se mejoro xd)
                 if (mostrarFicha) {
                     LazyColumn(
                         verticalArrangement = Arrangement.spacedBy(8.dp),

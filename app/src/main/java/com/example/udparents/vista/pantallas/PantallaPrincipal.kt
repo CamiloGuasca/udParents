@@ -52,7 +52,7 @@ fun PantallaPrincipal(
         uidPadre?.let { vistaModelo.cargarHijos(it) }
     }
 
-    // 2. 💡 Lógica para obtener y guardar el token de FCM cuando el padre inicie sesión
+    // 2. Lógica para obtener y guardar el token de FCM cuando el padre inicie sesión
     LaunchedEffect(uidPadre) {
         if (uidPadre != null) {
             coroutineScope.launch {
@@ -87,7 +87,7 @@ fun PantallaPrincipal(
         {
             Text("Bienvenido 👋", fontSize = 24.sp, color = Color(0xFF003366), textAlign = TextAlign.Center)
             Spacer(modifier = Modifier.height(32.dp))
-            // 🔁 Estado local para saber si está activada la alerta (por ahora por defecto en false)
+            // Estado local para saber si está activada la alerta (por ahora por defecto en false)
             Card(
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5)),

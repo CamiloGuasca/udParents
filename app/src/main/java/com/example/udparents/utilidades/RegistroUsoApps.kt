@@ -56,7 +56,7 @@ object RegistroUsoApps {
         val repositorio = RepositorioApps()
 
         // Obtener la aplicación que está actualmente en primer plano
-        // Esto es crucial para evitar sobrescribir su uso con un valor potencialmente desactualizado
+        // Ecrucial para evitar sobrescribir su uso con un valor potencialmente desactualizado
         val topApp = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, ahora - 10000, ahora)
             .maxByOrNull { it.lastTimeUsed }
         val paqueteEnPrimerPlano = topApp?.packageName
@@ -68,7 +68,6 @@ object RegistroUsoApps {
                 val tiempoUso = app.totalTimeInForeground
                 val packageName = app.packageName
 
-                // *** CAMBIO CLAVE AQUÍ ***
                 // Si la aplicación está actualmente en primer plano, la ignoramos en este barrido.
                 // Su tiempo de uso se está incrementando en tiempo real por el otro mecanismo.
                 if (packageName == paqueteEnPrimerPlano) {

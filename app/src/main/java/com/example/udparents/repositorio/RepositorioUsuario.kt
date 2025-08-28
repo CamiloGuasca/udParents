@@ -71,16 +71,15 @@ class RepositorioUsuario {
                         ref.get()
                             .addOnSuccessListener { snap ->
                                 if (snap.exists()) {
-                                    // Ya hay perfil → continuar
+                                    // Ya hay un perfil → continuar
                                     onResultado(true, null)
                                 } else {
                                     // Primer login verificado → crear perfil
                                     val datos = mapOf(
-                                        "nombre" to usuario.nombre.trim(),      // usa el nombre que tengas en memoria
+                                        "nombre" to usuario.nombre.trim(),      // usa el nombre que tenemos en memoria
                                         "correo" to usuario.correo.trim(),
                                         "createdAt" to System.currentTimeMillis(),
-                                        // Puedes agregar flags por defecto aquí si los usas:
-                                        // "alertaContenidoProhibido" to false
+
                                     )
                                     ref.set(datos)
                                         .addOnSuccessListener { onResultado(true, null) }

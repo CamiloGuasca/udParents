@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun PantallaBloqueoApp(
     nombreApp: String,
-    motivoBloqueo: String // <<-- ¡Ahora la función acepta el motivo del bloqueo!
+    motivoBloqueo: String
 ) {
     Surface(
         modifier = Modifier

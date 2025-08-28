@@ -68,7 +68,7 @@ object PdfUtils {
         var document: PdfDocument? = null
         var out: OutputStream? = null
 
-        composeView.post { // Usa composeView.post para asegurar que la vista esté medida y dibujada
+        composeView.post { // sE usa composeView.post para asegurar que la vista esté medida y dibujada
             try {
                 composeView.measure(
                     View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
@@ -148,7 +148,7 @@ object PdfUtils {
     }
 
     /**
-     * NUEVO: Genera PDF desde un Composable y lo guarda en "Descargas".
+     *  Genera PDF desde un Composable y lo guarda en "Descargas".
      * Devuelve el Uri del archivo o null si falló.
      */
     suspend fun generarPdfDesdeComposableAStorage(
@@ -181,7 +181,7 @@ object PdfUtils {
         var document: PdfDocument? = null
         var out: OutputStream? = null
 
-        composeView.post { // Usa composeView.post para asegurar que la vista esté medida y dibujada
+        composeView.post { // Se usa composeView.post para asegurar que la vista esté medida y dibujada
             try {
                 composeView.measure(
                     View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
@@ -252,7 +252,7 @@ object PdfUtils {
     }
 
     /**
-     * NUEVO: Compartir un PDF mediante ACTION_SEND.
+     *  Compartir un PDF mediante ACTION_SEND.
      */
     fun compartirPdf(context: Context, uri: Uri) {
         val intent = Intent(Intent.ACTION_SEND).apply {

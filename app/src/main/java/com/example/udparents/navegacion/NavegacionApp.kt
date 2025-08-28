@@ -34,7 +34,7 @@ object Rutas {
     const val RESUMEN_TIEMPO = "resumen_tiempo"
     const val INFORME_APPS_MAS_USADAS = "informe_apps_mas_usadas"
     const val REGISTRO_BLOQUEOS = "registro_bloqueos"
-    // 💡 La ruta VISTA_PDF se ha eliminado porque ya no se necesita la pantalla
+
 }
 
 // Función de extensión para encontrar la actividad de forma segura
@@ -231,10 +231,10 @@ fun NavegacionApp() {
         composable(Rutas.INFORME_APPS_MAS_USADAS) {
             PantallaInformeAppsMasUsadas(
                 onVolverAlMenuPadre = { navController.popBackStack() },
-                activity = activity // Pasa el parámetro `activity` aquí
+                activity = activity
             )
         }
-        // 💡 Composable corregido: ya no se pasa el navController
+
         composable(Rutas.REGISTRO_BLOQUEOS) {
             PantallaRegistroBloqueos(
                 onVolverAlMenuPadre = { navController.popBackStack() },
@@ -242,7 +242,7 @@ fun NavegacionApp() {
                 navController = navController
             )
         }
-        // 💡 El composable para Rutas.VISTA_PDF se ha eliminado
+
         composable(
             route = Rutas.DETALLES_CONTROL,
             arguments = listOf(navArgument("uidHijo") { type = NavType.StringType })

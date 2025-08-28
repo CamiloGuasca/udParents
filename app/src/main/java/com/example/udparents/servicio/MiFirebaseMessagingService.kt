@@ -24,7 +24,7 @@ class MiFirebaseMessagingService : FirebaseMessagingService() {
      */
     override fun onNewToken(token: String) {
         Log.d(TAG, "Nuevo token de FCM: $token")
-        // Aquí debes guardar el token en Firestore.
+        // Aquí se guarda el token en Firestore.
         // Si el usuario ya está logeado, lo guardamos.
         // Si no, lo guardamos cuando el usuario inicie sesión.
         enviarTokenAFirestore(token)
@@ -52,7 +52,7 @@ class MiFirebaseMessagingService : FirebaseMessagingService() {
     private fun mostrarNotificacion(titulo: String, mensaje: String) {
         val channelId = "notificacion_exceso_tiempo"
         val notificationBuilder = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.drawable.ic_launcher_foreground) // Usa un ícono de tu app
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(titulo)
             .setContentText(mensaje)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

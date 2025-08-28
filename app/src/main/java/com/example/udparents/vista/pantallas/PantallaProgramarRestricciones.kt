@@ -63,7 +63,7 @@ fun PantallaProgramarRestricciones(
     var editingRestriction by remember { mutableStateOf<RestriccionHorario?>(null) }
 
 
-    // Paleta de colores consistente con el diseño de la aplicación
+    // Paleta de colores
     val primaryDark = Color(0xFF1A237E)
     val primaryLight = Color(0xFF3F51B5)
     val accentColor = Color(0xFFCDDC39)
@@ -241,7 +241,7 @@ fun RestriccionHorarioCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = onSurfaceColor
             )
-            Spacer(Modifier.height(12.dp)) // Espaciado antes de los botones
+            Spacer(Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End

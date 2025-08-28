@@ -29,10 +29,8 @@ import java.util.Date
 import java.util.Calendar
 import kotlinx.coroutines.launch // Importar coroutineScope.launch
 
-// =================================================================================================
-// PANTALLA PARA HU-013: Informe de Aplicaciones Más Usadas
+//HU13
 // Muestra una lista de las apps más utilizadas por el hijo, con su tiempo de uso.
-// =================================================================================================
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

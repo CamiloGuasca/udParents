@@ -25,7 +25,7 @@ class VistaModeloUsuario : ViewModel() {
     private val _usuario = MutableStateFlow(Usuario())
     val usuario: StateFlow<Usuario> = _usuario
     private companion object {
-        // mínimo de letras (sin contar espacios); súbelo si quieres algo más estricto
+        // mínimo de letras
         const val MIN_LETRAS_SIN_ESPACIOS = 10
     }
     fun actualizarCorreo(correo: String) {
@@ -77,7 +77,7 @@ class VistaModeloUsuario : ViewModel() {
         _mensaje.value = null
         Log.d("VMUsuario", "Llamando a repositorio.registrarUsuario()")
 
-        // IMPORTANTE: el repositorio ya envía el correo de verificación
+        //el repositorio  envía el correo de verificación
         repositorio.registrarUsuario(usuarioNormalizado) { exito, error ->
             _cargando.value = false
             if (exito) {
@@ -141,7 +141,6 @@ class VistaModeloUsuario : ViewModel() {
         _alertaContenido.value = nuevoEstado
         repositorio.actualizarEstadoAlertaContenido(uid, nuevoEstado) { exito ->
             if (!exito) {
-                // Podrías revertir el cambio local o mostrar un mensaje
             }
         }
     }

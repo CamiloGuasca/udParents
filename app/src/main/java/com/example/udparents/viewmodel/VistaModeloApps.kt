@@ -63,7 +63,7 @@ class VistaModeloApps : ViewModel() {
         viewModelScope.launch {
             try {
                 repositorio.eliminarRestriccionHorario(uidHijo, restriccionId)
-                cargarRestriccionesHorario(uidHijo) // Recargar para actualizar la UI
+                cargarRestriccionesHorario(uidHijo) //se  Recargar para actualizar la UI
             } catch (e: Exception) {
                 Log.e("VistaModeloApps", "Error al eliminar restricción de horario: ${e.message}", e)
             }
@@ -132,9 +132,9 @@ class VistaModeloApps : ViewModel() {
     fun establecerLimite(uidHijo: String, paquete: String, tiempoLimite: Long) {
         viewModelScope.launch {
             try {
-                // Esta llamada ahora usará la ruta y el campo correctos.
+                // la llamada ahora usa la ruta y el campo correctos.
                 repositorio.establecerLimiteApp(uidHijo, paquete, tiempoLimite)
-                // Actualiza el estado localmente
+                // se actualiz el estado localmente
                 _limitesApp.value = _limitesApp.value.toMutableMap().apply {
                     put(paquete, tiempoLimite)
                 }
@@ -170,7 +170,7 @@ class VistaModeloApps : ViewModel() {
     fun cargarResumenTiempoPantallaSemanal(uidHijo: String) {
         viewModelScope.launch {
             try {
-                // Llama a una nueva función en el repositorio (que crearemos después).
+                // Llama a una nueva función.
                 val resumenSemanal = repositorio.obtenerTiempoPantallaSemanal(uidHijo)
                 _tiempoPantallaSemanal.value = resumenSemanal
                 Log.d("VistaModeloApps", "Resumen semanal de tiempo de pantalla cargado: ${resumenSemanal.size} semanas.")
@@ -181,7 +181,7 @@ class VistaModeloApps : ViewModel() {
     }
 
     /**
-     * NUEVO: Carga el informe de aplicaciones más usadas para un hijo y un rango de fechas.
+     *  Carga el informe de aplicaciones más usadas para un hijo y un rango de fechas.
      * @param uidHijo El UID del hijo.
      * @param desde El timestamp de inicio del rango.
      * @param hasta El timestamp de fin del rango.
