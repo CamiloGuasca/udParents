@@ -95,12 +95,15 @@ fun PantallaResumenTiempoPantalla(
 
     // CORRECCIÓN: Calcular totales correctos (HOY y ÚLTIMOS 7 DÍAS)
     LaunchedEffect(tiempoDiario) {
+        // Aplica el hotfix para que el valor de hoy no exceda el tiempo transcurrido
+        val diarioCapped = capToday(tiempoDiario)
+
         // Diario: solo la clave del día de hoy
         val hoy = hoyKey()
-        tiempoTotalDiario.value = tiempoDiario[hoy] ?: 0L
+        tiempoTotalDiario.value = diarioCapped[hoy] ?: 0L
 
         // Semanal: suma de los últimos 7 días (incluye hoy) usando el mapa diario
-        val ult7 = filtrarUltimosNDias(tiempoDiario, 7)
+        val ult7 = filtrarUltimosNDias(diarioCapped, 7)
         tiempoTotalSemanal.value = ult7.values.sum()
     }
 
@@ -183,7 +186,8 @@ fun PantallaResumenTiempoPantalla(
                 )
 
                 if (vistaSeleccionada == "Diaria") {
-                    val ultimos7Dias = filtrarUltimosNDias(tiempoDiario, 7)
+                    // Aplica el hotfix al gráfico
+                    val ultimos7Dias = filtrarUltimosNDias(capToday(tiempoDiario), 7)
                     GraficoDeBarras(
                         data = ultimos7Dias,
                         titulo = "Uso Diario",
@@ -193,7 +197,7 @@ fun PantallaResumenTiempoPantalla(
                     )
                 } else {
                     GraficoDeBarras(
-                        data = tiempoSemanal.mapKeys { it.key.toString() },
+                        data = tiempoSemanal,
                         titulo = "Uso Semanal",
                         barColor = accentColor,
                         labelColor = onSurfaceColor,
@@ -287,17 +291,14 @@ fun GraficoDeBarras(
 ) {
     val textMeasurer = rememberTextMeasurer()
     val sortedData = if (titulo == "Uso Diario") {
-        // Las claves vienen como "yyyy-MM-dd": el orden lexicográfico ya funciona bien.
+        // "yyyy-MM-dd" ya ordena bien lexicográficamente
         data.toList().sortedBy { it.first }
     } else {
-        // Semanal: si las claves son números de semana ("1","2","10"...), ordénalas como enteros.
-        // Si vinieran como "2024-W35", extraemos el número "35" y ordenamos por él.
-        data.toList().sortedBy { kv ->
-            val k = kv.first
-            k.toIntOrNull()
-                ?: Regex("""\d+""").find(k)?.value?.toIntOrNull()
-                ?: Int.MAX_VALUE
-        }
+        // Clave "YYYY-W##" → ordena primero por año y luego por semana
+        data.toList().sortedWith(compareBy(
+            { it.first.substringBefore("-W").toIntOrNull() ?: Int.MAX_VALUE }, // año
+            { it.first.substringAfter("-W").toIntOrNull() ?: Int.MAX_VALUE }   // semana
+        ))
     }
 
     val maxTiempo = sortedData.maxOfOrNull { it.second } ?: 0L
@@ -402,9 +403,9 @@ fun GraficoDeBarras(
                             }
                         }
                         else -> {
-                            // Muestra el número de la semana para la vista semanal.
-                            // Si el label es un número, lo muestra.
-                            label
+                            // label viene como "YYYY-W##"
+                            val w = label.substringAfter("-W")
+                            "Sem $w"
                         }
                     }
 
@@ -468,4 +469,28 @@ private fun filtrarUltimosNDias(
 ): Map<String, Long> {
     val keys = keysUltimosNDias(n)
     return keys.associateWith { k -> data[k] ?: 0L }
+}
+
+// =================================================================================================
+// HOTFIX: Helpers para acotar el uso de hoy a lo que realmente ha transcurrido en el día
+// Esto evita picos irreales por el cálculo del repositorio (ej. "últimas 24h")
+// =================================================================================================
+
+private fun startOfTodayMillis(): Long {
+    val cal = Calendar.getInstance()
+    cal.set(Calendar.HOUR_OF_DAY, 0)
+    cal.set(Calendar.MINUTE, 0)
+    cal.set(Calendar.SECOND, 0)
+    cal.set(Calendar.MILLISECOND, 0)
+    return cal.timeInMillis
+}
+
+private fun capToday(data: Map<String, Long>): Map<String, Long> {
+    val hoy = hoyKey()
+    val start = startOfTodayMillis()
+    val elapsed = System.currentTimeMillis() - start
+    val current = data[hoy] ?: 0L
+    // el uso de hoy jamás puede ser mayor al tiempo transcurrido del día
+    val capped = minOf(current, elapsed.coerceAtLeast(0L))
+    return data.toMutableMap().apply { put(hoy, capped) }
 }

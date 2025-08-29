@@ -29,7 +29,11 @@ import android.os.Process
 import android.provider.Settings
 import java.util.Calendar
 import android.app.admin.DevicePolicyManager
+import android.content.BroadcastReceiver
 import android.content.ComponentName
+import android.content.IntentFilter
+import android.os.PowerManager
+import android.app.KeyguardManager
 import com.example.udparents.seguridad.AdminReceiver
 
 
@@ -38,13 +42,12 @@ class RegistroUsoService : Service() {
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private var tareaMonitoreo: Job? = null
     private var tareaRegistroUso: Job? = null
-    private val intervaloChequeoAppEnUso = 3000L // 3 segundos para el chequeo de bloqueo
+    private val intervaloChequeoAppEnUso = 1000L // 1 segundo para el chequeo de bloqueo (ajustado para mayor reactividad)
     private val intervaloRegistroUso = 30 * 1000L // 30 segundos para el barrido general en Firebase
     private var paqueteBloqueadoActual: String? = null
-    private var notificadoTiempoRestante = false
-    private var notificadoUltimosSegundos = false
+    // notificadoTiempoRestante y notificadoUltimosSegundos ya no se utilizan.
     private var lastCheckTime: Long = 0L
-    private val UMBRAL_TIEMPO_RESTANTE_MS = 60 * 1000L // 1 minuto antes del límite
+    // UMBRAL_TIEMPO_RESTANTE_MS ya no se utiliza.
     private var notified60s = false
     private var notified30s = false
     private var notified10s = false
@@ -54,13 +57,70 @@ class RegistroUsoService : Service() {
     private var ultimoAvisoPermisosMs: Long = 0L
     private val COOLDOWN_AVISO_MS = 20_000L // 20s anticancel spam
     private var huboFalloPermisos = false   // ⬅️ NUEVO: ya hubo fallo desde que arrancó
+    // NUEVO: estado de pantalla/bloqueo
+    private lateinit var pm: PowerManager
+    private lateinit var km: KeyguardManager
+    private var isInteractive = true
+    private var isUnlocked = true
+    private var ultimoBloqueoMs: Long = 0L
+    private val COOLDOWN_BLOQUEO_MS = 1500L  // 1.5s para no spamear la Activity (ajustado)
+
+    // NUEVO: estado para detectar cambio de app en foreground
+    private var paqueteAnteriorEnUso: String? = null
+
+    // Recordatorios periódicos de tiempo restante (además de los umbrales 60/30/10)
+    private var ultimoAvisoTiempoRestanteMs = 0L
+    private val COOLDOWN_RECORDATORIO_MS = 15_000L  // cada 15 s como máximo (ajústalo)
+    private val COTA_RECORDATORIO_MS = 60_000L      // solo recordar cuando queda ≤ 60 s (ajústalo)
+
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        // Inicializa PowerManager y KeyguardManager
+        pm = getSystemService(PowerManager::class.java)
+        km = getSystemService(KeyguardManager::class.java)
+        isInteractive = pm.isInteractive
+        isUnlocked = !km.isKeyguardLocked
+        // Receiver para pantalla/bloqueo
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_USER_PRESENT)
+            addAction(Intent.ACTION_USER_UNLOCKED)
+        }
+        registerReceiver(screenReceiver, filter)
+    }
+
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(ctx: Context, intent: Intent) {
+            when (intent.action) {
+                Intent.ACTION_SCREEN_ON -> {
+                    isInteractive = true
+                    isUnlocked = !km.isKeyguardLocked
+                    // lastCheckTime se actualiza en el primer tick válido de verificarAppEnUso
+                }
+                Intent.ACTION_SCREEN_OFF -> {
+                    isInteractive = false
+                    lastCheckTime = 0L
+                    paqueteAnteriorEnUso = null // Reinicia al apagarse
+                }
+                Intent.ACTION_USER_PRESENT, Intent.ACTION_USER_UNLOCKED -> {
+                    isUnlocked = true
+                    isInteractive = pm.isInteractive
+                    // lastCheckTime se actualiza en el primer tick válido
+                }
+            }
+        }
+    }
 
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d("RegistroUsoService", "✅ Servicio iniciado correctamente")
         Log.d("RegistroUsoService", "🧬 Servicio sigue corriendo tras cierre")
         mostrarNotificacion()
-// 🔒 Asegurar que el admin de dispositivo esté activo (impide desinstalación)
+        // 🔒 Asegurar que el admin de dispositivo esté activo (impide desinstalación)
         if (!isDeviceAdminActive(applicationContext)) {
             solicitarActivacionDeviceAdmin(applicationContext)
         }
@@ -70,7 +130,6 @@ class RegistroUsoService : Service() {
                 try {
                     // 1) Verifica permisos críticos
                     val permisosOk = verificarPermisosEsenciales()
-
                     // 2) Solo si están OK, continua tu lógica normal
                     if (permisosOk) {
                         verificarAppEnUso()
@@ -82,36 +141,51 @@ class RegistroUsoService : Service() {
             }
         }
 
-        tareaRegistroUso = scope.launch {
-            while (isActive) {
-                try {
-                    Log.d("RegistroUsoService", "📝 Iniciando registro periódico de uso de apps en Firebase (barrido general)...")
-                    RegistroUsoApps.registrarUsoAplicaciones(applicationContext)
-                    Log.d("RegistroUsoService", "✅ Registro periódico de uso de apps finalizado.")
-                } catch (e: Exception) {
-                    Log.e("RegistroUsoService", "❌ Error registrando uso de apps: ${e.message}", e)
-                }
-                delay(intervaloRegistroUso)
-            }
-        }
+        // Tarea para registrar el uso total y sincronizar con Firebase
+        // Desactivada para evitar doble conteo, como lo sugeriste
+        // tareaRegistroUso = scope.launch {
+        //     while (isActive) {
+        //         try {
+        //             Log.d("RegistroUsoService", "📝 Iniciando registro periódico de uso de apps en Firebase (barrido general)...")
+        //             RegistroUsoApps.registrarUsoAplicaciones(applicationContext)
+        //             Log.d("RegistroUsoService", "✅ Registro periódico de uso de apps finalizado.")
+        //         } catch (e: Exception) {
+        //             Log.e("RegistroUsoService", "❌ Error registrando uso de apps: ${e.message}", e)
+        //         }
+        //         delay(intervaloRegistroUso)
+        //     }
+        // }
 
         return START_STICKY
     }
 
     private suspend fun verificarAppEnUso() {
+        // GATE: NO sumar si pantalla apagada o dispositivo bloqueado
+        if (!isInteractive || !isUnlocked) {
+            lastCheckTime = 0L
+            return
+        }
+
         val context = applicationContext
         val usageStatsManager =
             context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val ahora = System.currentTimeMillis()
         val hace10Segundos = ahora - 10_000
 
-        val stats: List<UsageStats> = usageStatsManager.queryUsageStats(
-            UsageStatsManager.INTERVAL_DAILY,
-            hace10Segundos,
-            ahora
-        )
+        val stats: List<UsageStats> = try {
+            usageStatsManager.queryUsageStats(
+                UsageStatsManager.INTERVAL_DAILY, hace10Segundos, ahora
+            )
+        } catch (e: SecurityException) {
+            lastCheckTime = 0L
+            paqueteAnteriorEnUso = null
+            Log.w("RegistroUsoService", "Permiso de uso revocado en caliente", e)
+            return
+        }
 
         if (stats.isNullOrEmpty()) {
+            lastCheckTime = 0L
+            paqueteAnteriorEnUso = null
             Log.d("RegistroUsoService", "No se encontraron estadísticas de uso recientes.")
             return
         }
@@ -121,6 +195,16 @@ class RegistroUsoService : Service() {
             return
         }
         val paqueteActual = appEnUso.packageName
+
+        // Filtro básico: evita contarte a ti mismo y al launcher
+        val home = homePackage(context)
+        if (paqueteActual == packageName || paqueteActual == home) {
+            // no contamos tiempo en el lanzador o en nuestra app
+            lastCheckTime = 0L
+            paqueteAnteriorEnUso = paqueteActual
+            return
+        }
+
         val uidHijo = FirebaseAuth.getInstance().currentUser?.uid ?: run {
             Log.w("RegistroUsoService", "UID del hijo no disponible, no se puede verificar bloqueo.")
             return
@@ -128,22 +212,29 @@ class RegistroUsoService : Service() {
         val repositorio = RepositorioApps()
         val nombreAppActual = obtenerNombreApp(context, paqueteActual)
 
-        // CALCULAR EL TIEMPO TRANSCURRIDO REAL
+        // Cambio de app en foreground: inicializa delta y sal del tick
         val now = System.currentTimeMillis()
-        val timeElapsed = if (lastCheckTime == 0L) 0L else now - lastCheckTime
-        lastCheckTime = now
-
-        // Incrementar el uso de la aplicación activa con el tiempo transcurrido real
-        repositorio.incrementarUsoAplicacion(uidHijo, paqueteActual, nombreAppActual, timeElapsed)
-
-        val tiempoUsoActual = repositorio.obtenerUsoAppDelDia(uidHijo, paqueteActual)
-
-        // Reinicia las banderas si la app actual ha cambiado
-        if (paqueteActual != paqueteBloqueadoActual) {
+        val cambioDeApp = (paqueteAnteriorEnUso != paqueteActual)
+        if (cambioDeApp) {
+            paqueteAnteriorEnUso = paqueteActual
             notified60s = false
             notified30s = false
             notified10s = false
+            ultimoAvisoTiempoRestanteMs = 0L
+            lastCheckTime = now  // arrancamos medición para la nueva app
         }
+
+// Calcula delta: si cambió de app, no sumes tiempo en este tick
+        val timeElapsed = if (cambioDeApp || lastCheckTime == 0L) 0L else now - lastCheckTime
+        lastCheckTime = now
+
+
+        if (timeElapsed > 0 && timeElapsed <= 60_000) {
+            // Incrementar el uso de la aplicación activa con el tiempo transcurrido real
+            repositorio.incrementarUsoAplicacion(uidHijo, paqueteActual, nombreAppActual, timeElapsed)
+        }
+
+        val tiempoUsoActual = repositorio.obtenerUsoAppDelDia(uidHijo, paqueteActual)
 
         var debeBloquear = false
         var motivoBloqueo = ""
@@ -185,6 +276,21 @@ class RegistroUsoService : Service() {
                     }
                 }
             }
+
+            // --- Recordatorio periódico mientras esté por debajo de la cota ---
+            if (tiempoLimite > 0L && tiempoRestante in 1..COTA_RECORDATORIO_MS) {
+                val ahoraMs = System.currentTimeMillis()
+                val fueraDeCooldown = (ahoraMs - ultimoAvisoTiempoRestanteMs) >= COOLDOWN_RECORDATORIO_MS
+                if (fueraDeCooldown) {
+                    mostrarNotificacionTiempoRestante(nombreAppActual, tiempoRestante)
+                    ultimoAvisoTiempoRestanteMs = ahoraMs
+                }
+            }
+            // Si el tiempo vuelve a subir por encima de la cota, limpiamos el “reloj” de recordatorios
+            if (tiempoRestante > COTA_RECORDATORIO_MS) {
+                ultimoAvisoTiempoRestanteMs = 0L
+            }
+
             val bloqueadaPorLimite = tiempoLimite > 0L && tiempoUsoActual >= tiempoLimite
             if (bloqueadaPorLimite) {
                 debeBloquear = true
@@ -232,14 +338,19 @@ class RegistroUsoService : Service() {
         }
 
         if (debeBloquear) {
-            if (paqueteActual != paqueteBloqueadoActual) {
+            val ahora = System.currentTimeMillis()
+            val fueraDeCooldown = (ahora - ultimoBloqueoMs) > COOLDOWN_BLOQUEO_MS
+
+            // Lanza el bloqueo si es otra app o si ya pasó el cooldown
+            if (paqueteActual != paqueteBloqueadoActual || fueraDeCooldown) {
                 paqueteBloqueadoActual = paqueteActual
-                Log.d("RegistroUsoService", "🔒 App bloqueada detectada: $nombreAppActual ($paqueteActual) - Motivo: $motivoBloqueo")
+                ultimoBloqueoMs = ahora
+
+                Log.d("RegistroUsoService", "🔒 Bloqueo forzado: $nombreAppActual ($paqueteActual) - Motivo: $motivoBloqueo")
 
                 val uidPadre = SharedPreferencesUtil.obtenerUidPadre(applicationContext) ?: ""
 
                 if (uidPadre.isNotBlank()) {
-                    Log.d("RegistroUsoService", "-> Se va a enviar notificación PUSH al padre con UID: $uidPadre")
                     val sender = NotificacionSender()
                     scope.launch {
                         sender.enviarNotificacionAlPadre(
@@ -259,10 +370,7 @@ class RegistroUsoService : Service() {
                     scope.launch {
                         try {
                             repoBloqueos.registrarBloqueo(uidHijo, uidPadre, bloqueoRegistro)
-                            Log.d("RegistroUsoService", "✅ Intento de bloqueo registrado en Firebase.")
-                        } catch (e: Exception) {
-                            Log.e("RegistroUsoService", "❌ Error al registrar bloqueo: ${e.message}", e)
-                        }
+                        } catch (_: Exception) { }
                     }
                 }
 
@@ -275,8 +383,9 @@ class RegistroUsoService : Service() {
                 context.startActivity(intent)
             }
         } else {
+            // Solo limpia cuando de verdad NO deba bloquear
             if (paqueteBloqueadoActual != null) {
-                Log.d("RegistroUsoService", "✅ App desbloqueada o cambio de app: $paqueteActual")
+                Log.d("RegistroUsoService", "✅ App ya no requiere bloqueo: $paqueteActual")
             }
             paqueteBloqueadoActual = null
         }
@@ -292,15 +401,20 @@ class RegistroUsoService : Service() {
         }
     }
 
+    private fun homePackage(context: Context): String? {
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        return context.packageManager.resolveActivity(intent, 0)?.activityInfo?.packageName
+    }
+
+
     override fun onDestroy() {
         super.onDestroy()
         Log.w("RegistroUsoService", "🛑 Servicio detenido inesperadamente")
+        try { unregisterReceiver(screenReceiver) } catch (_: Exception) {}
         scope.cancel()
         tareaMonitoreo?.cancel()
         tareaRegistroUso?.cancel()
     }
-
-    override fun onBind(intent: Intent?): IBinder? = null
 
     private fun crearCanalNotificacion() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -331,13 +445,14 @@ class RegistroUsoService : Service() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        val restartService = Intent(applicationContext, RegistroUsoService::class.java)
-        restartService.setPackage(packageName)
+        val restartService = Intent(applicationContext, RegistroUsoService::class.java).setPackage(packageName)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             applicationContext.startForegroundService(restartService)
         } else {
             applicationContext.startService(restartService)
         }
+        // Opcional: Reforzar la notificación en el restart
+        mostrarNotificacion()
     }
     private fun mostrarNotificacionTiempoRestante(nombreApp: String, tiempoRestanteMs: Long) {
         val minutos = tiempoRestanteMs / 60000
@@ -622,6 +737,4 @@ class RegistroUsoService : Service() {
             context.startActivity(intent) // abre la pantalla de activación
         }
     }
-
-
 }

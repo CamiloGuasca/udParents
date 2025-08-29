@@ -29,8 +29,8 @@ class VistaModeloApps : ViewModel() {
     val restriccionesHorario: StateFlow<List<RestriccionHorario>> = _restriccionesHorario
     private val _tiempoPantallaDiario = MutableStateFlow<Map<String, Long>>(emptyMap())
     val tiempoPantallaDiario: StateFlow<Map<String, Long>> = _tiempoPantallaDiario
-    private val _tiempoPantallaSemanal = MutableStateFlow<Map<Int, Long>>(emptyMap())
-    val tiempoPantallaSemanal: StateFlow<Map<Int, Long>> = _tiempoPantallaSemanal
+    private val _tiempoPantallaSemanal = MutableStateFlow<Map<String, Long>>(emptyMap())
+    val tiempoPantallaSemanal: StateFlow<Map<String, Long>> = _tiempoPantallaSemanal
     private val _appsMasUsadas = MutableStateFlow<Map<String, Long>>(emptyMap())
     val appsMasUsadas: StateFlow<Map<String, Long>> = _appsMasUsadas
     private val _registroBloqueos = MutableStateFlow<List<BloqueoRegistro>>(emptyList())

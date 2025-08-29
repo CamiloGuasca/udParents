@@ -9,7 +9,7 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import java.util.Calendar
 import java.util.Date
-import com.google.firebase.firestore.FieldValue // ¡Importante: Añadir esta importación!
+import com.google.firebase.firestore.FieldValue
 import java.util.Locale
 
 class RepositorioApps {
@@ -248,15 +248,12 @@ class RepositorioApps {
         return "%04d-%02d-%02d".format(year, month, day)
     }
 
-    /**
-     * Obtiene el tiempo total de pantalla por día para un hijo, solo de la última semana.
-     * @param uidHijo El UID del hijo.
-     * @return Un mapa donde la clave es la fecha (String) y el valor es el tiempo total en milisegundos (Long).
-     */
+    // =================================================================================================
+    // FUNCIÓN ACTUALIZADA: Obtiene el tiempo total de pantalla por día, ahora con CAP
+    // =================================================================================================
     suspend fun obtenerTiempoPantallaDiario(uidHijo: String): Map<String, Long> {
         return try {
             val calendar = Calendar.getInstance()
-            // Obtener la fecha de inicio de la semana (lunes a las 00:00:00)
             calendar.firstDayOfWeek = Calendar.MONDAY
             calendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
             calendar.set(Calendar.HOUR_OF_DAY, 0)
@@ -267,18 +264,31 @@ class RepositorioApps {
 
             val snapshot = db.collection("hijos").document(uidHijo)
                 .collection("uso_apps")
-                // Filtra solo los documentos de la última semana.
                 .whereGreaterThanOrEqualTo("fechaUso", inicioSemana)
                 .get()
                 .await()
 
-            // Agrupa todos los usos por fecha y suma el tiempo.
             val resumen = snapshot.documents.mapNotNull { it.toObject(AppUso::class.java) }
                 .groupBy { formatearFecha(it.fechaUso) }
-                .mapValues { (_, usosDelDia) ->
-                    usosDelDia.sumOf { it.tiempoUso }
-                }
-            Log.d(TAG, "✅ Resumen diario cargado: $resumen")
+                .mapValues { (_, usosDelDia) -> usosDelDia.sumOf { it.tiempoUso } }
+                .toMutableMap()
+
+            // --- CAP de hoy ---
+            val hoyCal = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val hoyKey = formatearFecha(System.currentTimeMillis())
+            val transcurridoHoy = System.currentTimeMillis() - hoyCal.timeInMillis
+            val actualHoy = resumen[hoyKey] ?: 0L
+            if (actualHoy > transcurridoHoy) {
+                Log.w(TAG, "CAPEANDO hoy: actual=$actualHoy > transcurrido=$transcurridoHoy")
+                resumen[hoyKey] = transcurridoHoy
+            }
+
+            Log.d(TAG, "✅ Resumen diario (capado hoy) cargado: $resumen")
             resumen
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error al obtener resumen de tiempo diario: ${e.message}", e)
@@ -286,47 +296,67 @@ class RepositorioApps {
         }
     }
 
-    /**
-     * Obtiene el tiempo total de pantalla por semana para un hijo.
-     * La función ha sido corregida para sumar el tiempo de las últimas 4 semanas.
-     * @param uidHijo El UID del hijo.
-     * @return Un mapa donde la clave es la semana del año (Int) y el valor es el tiempo total en milisegundos (Long).
-     */
-    suspend fun obtenerTiempoPantallaSemanal(uidHijo: String): Map<Int, Long> {
+    // =================================================================================================
+    // FUNCIÓN ACTUALIZADA: Obtiene el tiempo total de pantalla por semana, derivado del resumen diario
+    // =================================================================================================
+    suspend fun obtenerTiempoPantallaSemanal(uidHijo: String): Map<String, Long> {
         return try {
-            val calendar = Calendar.getInstance()
-            // Se calcula la fecha de inicio de la semana 4 semanas atrás para obtener el historial.
-            calendar.add(Calendar.WEEK_OF_YEAR, -4)
-            calendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-            calendar.set(Calendar.HOUR_OF_DAY, 0)
-            calendar.set(Calendar.MINUTE, 0)
-            calendar.set(Calendar.SECOND, 0)
-            calendar.set(Calendar.MILLISECOND, 0)
-            val inicioHace4Semanas = calendar.timeInMillis
+            // 1) Trae el diario (capado) para ~4 semanas
+            val cal = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+                add(Calendar.WEEK_OF_YEAR, -4)
+            }
+            val inicioHace4Semanas = cal.timeInMillis
 
-            // Consulta que filtra los datos de las últimas 4 semanas
             val snapshot = db.collection("hijos").document(uidHijo)
                 .collection("uso_apps")
                 .whereGreaterThanOrEqualTo("fechaUso", inicioHace4Semanas)
                 .get()
                 .await()
 
-            // Agrupa todos los usos por semana del año y suma el tiempo.
-            val resumen = snapshot.documents.mapNotNull { it.toObject(AppUso::class.java) }
-                .groupBy {
-                    val cal = Calendar.getInstance().apply { timeInMillis = it.fechaUso }
-                    cal.get(Calendar.WEEK_OF_YEAR)
-                }
-                .mapValues { (_, usosDeLaSemana) ->
-                    usosDeLaSemana.sumOf { it.tiempoUso }
-                }
-            Log.d(TAG, "✅ Resumen semanal cargado: $resumen")
-            resumen
+            val diario = snapshot.documents.mapNotNull { it.toObject(AppUso::class.java) }
+                .groupBy { formatearFecha(it.fechaUso) }
+                .mapValues { (_, usosDelDia) -> usosDelDia.sumOf { it.tiempoUso } }
+                .toMutableMap()
+
+            // --- CAP de hoy, igual que arriba ---
+            val hoyCal = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val hoyKey = formatearFecha(System.currentTimeMillis())
+            val transcurridoHoy = System.currentTimeMillis() - hoyCal.timeInMillis
+            val actualHoy = diario[hoyKey] ?: 0L
+            if (actualHoy > transcurridoHoy) {
+                Log.w(TAG, "CAPEANDO hoy: actual=$actualHoy > transcurrido=$transcurridoHoy")
+                diario[hoyKey] = transcurridoHoy
+            }
+
+            // 2) Agrupa esas fechas por número de semana con año para evitar mezclas
+            val resumenSemanal = diario.entries.groupBy { (keyFecha, _) ->
+                val c = Calendar.getInstance()
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                c.time = sdf.parse(keyFecha) ?: Date()
+                val yy = c.get(Calendar.YEAR)
+                val wk = c.get(Calendar.WEEK_OF_YEAR)
+                "${yy}-W${wk}"
+            }.mapValues { (_, entries) ->
+                entries.sumOf { it.value }
+            }
+
+            Log.d(TAG, "✅ Resumen semanal (derivado de diario capado) cargado: $resumenSemanal")
+            resumenSemanal
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error al obtener resumen de tiempo semanal: ${e.message}", e)
             emptyMap()
         }
     }
+
     suspend fun obtenerAppsMasUsadas(uidHijo: String, desde: Long, hasta: Long): Map<String, Long> {
         return try {
             // Realiza la consulta a Firestore filtrando los documentos por el rango de fechas.

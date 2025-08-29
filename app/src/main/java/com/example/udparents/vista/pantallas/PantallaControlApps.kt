@@ -26,6 +26,13 @@ import com.example.udparents.viewmodel.VistaModeloApps
 import kotlinx.coroutines.delay
 import kotlin.math.max
 import com.example.udparents.modelo.AppUso
+import java.util.Calendar
+
+// =================================================================================================
+// PANTALLA: Control de Aplicaciones
+// HU-009, HU-010 y HU-011
+// Muestra el uso de apps, permite establecer límites y bloquear/desbloquear.
+// =================================================================================================
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,17 +63,29 @@ fun PantallaControlApps(
         }
     }
 
+    // Función para obtener el inicio del día en la zona horaria local
+    fun startOfTodayLocal(): Long {
+        return Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+
+    // REVISADO: Carga inicial de usos y límites usando la hora local
     LaunchedEffect(uidHijo) {
+        val inicioHoy = startOfTodayLocal()
         val ahora = System.currentTimeMillis()
-        val inicioHoy = ahora - (ahora % (24 * 60 * 60 * 1000))
         vistaModeloApps.cargarUsos(uidHijo, inicioHoy, ahora)
         vistaModeloApps.cargarLimites(uidHijo)
     }
 
+    // REVISADO: Bucle para actualizar usos cada minuto usando la hora local
     LaunchedEffect(uidHijo) {
         while (true) {
+            val inicioHoy = startOfTodayLocal()
             val ahora = System.currentTimeMillis()
-            val inicioHoy = ahora - (ahora % (24 * 60 * 60 * 1000))
             vistaModeloApps.cargarUsos(uidHijo, inicioHoy, ahora)
             delay(60_000L)
         }
