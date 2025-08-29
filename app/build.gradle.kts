@@ -83,6 +83,7 @@ dependencies {
     // ✅ Google Ads
     // ---------------------------
     implementation(libs.ads.mobile.sdk)
+    implementation(libs.androidx.appcompat)
 
     // ---------------------------
     // ✅ Testing
