@@ -196,8 +196,10 @@ fun PantallaResumenTiempoPantalla(
                         axisColor = onSurfaceColor
                     )
                 } else {
+                    // ** CAMBIO AQUÍ: Ahora el gráfico semanal usa los datos diarios agrupados **
+                    val semanalISO = groupByIsoWeekAll(capToday(tiempoDiario))
                     GraficoDeBarras(
-                        data = tiempoSemanal,
+                        data = semanalISO,
                         titulo = "Uso Semanal",
                         barColor = accentColor,
                         labelColor = onSurfaceColor,
@@ -392,6 +394,21 @@ fun GraficoDeBarras(
                         size = Size(width = barWidth, height = barHeight)
                     )
 
+                    // ** CAMBIO AQUÍ: Etiqueta de valor (tiempo) encima de la barra **
+                    val valueLabel = formatMillisToShort(tiempo)
+                    val textBounds = textMeasurer.measure(
+                        AnnotatedString(valueLabel),
+                        style = TextStyle(fontSize = 12.sp, color = labelColor)
+                    )
+                    val labelX = barX + barWidth / 2 - textBounds.size.width / 2
+                    val labelY = (y - 6.dp.toPx()).coerceAtLeast(4.dp.toPx()) // un pequeño margen
+                    drawText(
+                        textMeasurer = textMeasurer,
+                        text = AnnotatedString(valueLabel),
+                        topLeft = Offset(labelX, labelY),
+                        style = TextStyle(fontSize = 12.sp, color = labelColor)
+                    )
+
                     // Dibuja la etiqueta del eje X (Día de la semana)
                     val etiqueta = when (titulo) {
                         "Uso Diario" -> {
@@ -493,4 +510,45 @@ private fun capToday(data: Map<String, Long>): Map<String, Long> {
     // el uso de hoy jamás puede ser mayor al tiempo transcurrido del día
     val capped = minOf(current, elapsed.coerceAtLeast(0L))
     return data.toMutableMap().apply { put(hoy, capped) }
+}
+
+// =================================================================================================
+// NUEVOS HELPERS PARA CÁLCULO Y AGRUPACIÓN DE SEMANAS EN ISO-8601
+// Esto asegura que la semana siempre empiece en lunes y resuelve el problema de las dos barras.
+// =================================================================================================
+private fun weekKeyISO(date: Date): String {
+    val cal = Calendar.getInstance().apply {
+        time = date
+        firstDayOfWeek = Calendar.MONDAY
+        minimalDaysInFirstWeek = 4
+    }
+    val year = cal.get(Calendar.YEAR)
+    val week = cal.get(Calendar.WEEK_OF_YEAR)
+    return "%04d-W%02d".format(year, week)
+}
+
+private fun groupByIsoWeekAll(data: Map<String, Long>): Map<String, Long> {
+    // data: "yyyy-MM-dd" -> millis (diario)
+    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val agg = mutableMapOf<String, Long>()
+    data.forEach { (k, v) ->
+        val d = runCatching { sdf.parse(k) }.getOrNull() ?: return@forEach
+        val wk = weekKeyISO(d)
+        agg[wk] = (agg[wk] ?: 0L) + v
+    }
+    // Ordenamos por (año, semana)
+    return agg.toList()
+        .sortedWith(compareBy(
+            { it.first.substringBefore("-W").toIntOrNull() ?: Int.MAX_VALUE },
+            { it.first.substringAfter("-W").toIntOrNull() ?: Int.MAX_VALUE }
+        ))
+        .toMap(LinkedHashMap()) // preserva orden
+}
+
+// Etiqueta compacta para la cifra encima de cada barra
+private fun formatMillisToShort(millis: Long): String {
+    if (millis <= 0) return "0m"
+    val h = TimeUnit.MILLISECONDS.toHours(millis)
+    val m = TimeUnit.MILLISECONDS.toMinutes(millis) % 60
+    return if (h > 0) "${h}h ${m}m" else "${m}m"
 }

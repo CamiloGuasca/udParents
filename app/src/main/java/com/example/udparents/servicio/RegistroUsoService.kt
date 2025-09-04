@@ -70,7 +70,7 @@ class RegistroUsoService : Service() {
 
     // Recordatorios periódicos de tiempo restante (además de los umbrales 60/30/10)
     private var ultimoAvisoTiempoRestanteMs = 0L
-    private val COOLDOWN_RECORDATORIO_MS = 15_000L  // cada 15 s como máximo (ajústalo)
+    private val COOLDOWN_RECORDATORIO_MS = 5_000L  // cada 5 s como máximo (ajústalo)
     private val COTA_RECORDATORIO_MS = 60_000L      // solo recordar cuando queda ≤ 60 s (ajústalo)
 
 
