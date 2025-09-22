@@ -13,6 +13,7 @@ import kotlinx.coroutines.tasks.await
 class NotificacionSender {
 
     private val TAG = "NotificacionSender"
+
     //  Usamos la región 'us-central1'
     private val functions = Firebase.functions("us-central1")
 
@@ -32,7 +33,10 @@ class NotificacionSender {
         Log.d(TAG, "  -> mensaje: '$mensaje'")
 
         if (uidPadre.isEmpty() || titulo.isEmpty() || mensaje.isEmpty()) {
-            Log.e(TAG, "❌ ERROR: Se detectó un valor vacío antes de la llamada a la Cloud Function.")
+            Log.e(
+                TAG,
+                "❌ ERROR: Se detectó un valor vacío antes de la llamada a la Cloud Function."
+            )
 
             return
         }

@@ -1,5 +1,6 @@
 package com.example.udparents.vista.pantallas
 
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -69,8 +70,12 @@ fun PantallaResumenTiempoPantalla(
     // Cargar los datos cuando el hijo seleccionado cambie
     LaunchedEffect(hijoSeleccionado) {
         hijoSeleccionado?.let {
-            viewModel.cargarResumenTiempoPantallaDiario(it.first)
-            viewModel.cargarResumenTiempoPantallaSemanal(it.first)
+            // ** EL CAMBIO ES AQUÍ **
+            // Antes tenías:
+            // viewModel.cargarResumenTiempoPantallaDiario(it.first)
+            // viewModel.cargarResumenTiempoPantallaSemanal(it.first)
+            // Ahora solo necesitas una llamada:
+            viewModel.cargarDatosTiempoPantalla(it.first)
         }
     }
 

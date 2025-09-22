@@ -383,4 +383,40 @@ class RepositorioApps {
             emptyMap()
         }
     }
+    /**
+     * Obtiene el uso de aplicaciones para un rango de fechas específico.
+     * Se puede usar para alimentar tanto la vista diaria como la semanal.
+     * @param uidHijo El UID del hijo.
+     * @param diasAnteriores El número de días que se quieren obtener (ej. 30 o 40).
+     * @return Un mapa con la fecha (yyyy-MM-dd) como clave y el tiempo total de uso diario en milisegundos.
+     */
+    suspend fun obtenerUsoPorRangoDeDias(uidHijo: String, diasAnteriores: Int): Map<String, Long> {
+        return try {
+            val calendar = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 23)
+                set(Calendar.MINUTE, 59)
+                set(Calendar.SECOND, 59)
+                add(Calendar.DAY_OF_YEAR, -diasAnteriores)
+            }
+            val fechaHaceNDias = calendar.timeInMillis
+
+            // Se hace una consulta a Firestore por el rango de fechas
+            val snapshot = db.collection("hijos").document(uidHijo)
+                .collection("uso_apps")
+                .whereGreaterThanOrEqualTo("fechaUso", fechaHaceNDias)
+                .get()
+                .await()
+
+            // Agrupa los datos por día para obtener el resumen diario
+            val resumen = snapshot.documents.mapNotNull { it.toObject(AppUso::class.java) }
+                .groupBy { formatearFecha(it.fechaUso) }
+                .mapValues { (_, usosDelDia) -> usosDelDia.sumOf { it.tiempoUso } }
+
+            Log.d(TAG, "✅ Uso por rango de ${diasAnteriores} días obtenido: ${resumen.size} días con datos.")
+            resumen
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error al obtener uso por rango de días: ${e.message}", e)
+            emptyMap()
+        }
+    }
 }
